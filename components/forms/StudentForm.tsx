@@ -53,7 +53,7 @@ export default function StudentForm({ teachers, salesAgents, student, redirectTo
 
   function handleCountryChange(country: string) {
     const currency = COUNTRY_CURRENCY[country] ?? 'USD'
-    setForm(f => ({ ...f, country, currency }))
+    setForm(f => ({ ...f, country, currency: currency as any }))
   }
 
   async function handleSubmit(e: React.FormEvent) {
