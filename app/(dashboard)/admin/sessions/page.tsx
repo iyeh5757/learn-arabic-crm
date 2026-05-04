@@ -1,47 +1,62 @@
+'use client'
 // app/(dashboard)/admin/sessions/page.tsx
-import { createClient } from '@/lib/supabase/server'
+import { useState, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 
-export default async function SessionsPage() {
+export default function SessionsPage() {
   const supabase = createClient()
+  const [sessions, setSessions] = useState<any[]>([])
+  const [teachers, setTeachers] = useState<any[]>([])
+  const [selectedTeacher, setSelectedTeacher] = useState('')
+  const [loading, setLoading] = useState(true)
 
-  const { data: sessions } = await supabase
-    .from('sessions')
-    .select(`
-      id, session_date, session_time, duration, session_type,
-      attendance_status, homework, student_rating, trial_status, feedback,
-      teacher:teachers(id, profile:profiles!teachers_user_id_fkey(name)),
-      student:students(id, name)
-    `)
-    .order('session_date', { ascending: false })
-    .limit(100)
+  useEffect(() => {
+    supabase.from('teachers').select('id, profile:profiles!teachers_user_id_fkey(name)').eq('is_active', true).then(({ data }) => setTeachers(data ?? []))
+  }, [])
 
-  const typeColor: Record<string, { bg: string; text: string }> = {
-    paid:  { bg: '#ECFDF5', text: '#059669' },
-    trial: { bg: '#EFF6FF', text: '#2563EB' },
-  }
+  useEffect(() => {
+    setLoading(true)
+    let query = supabase
+      .from('sessions')
+      .select('*, student:students(name), teacher:teachers(id, profile:profiles!teachers_user_id_fkey(name))')
+      .order('session_date', { ascending: false })
+      .limit(200)
+    if (selectedTeacher) query = query.eq('teacher_id', selectedTeacher)
+    query.then(({ data }) => { setSessions(data ?? []); setLoading(false) })
+  }, [selectedTeacher])
+
   const attColor: Record<string, { bg: string; text: string }> = {
     attended:  { bg: '#ECFDF5', text: '#059669' },
     'no-show': { bg: '#FEF2F2', text: '#DC2626' },
     cancelled: { bg: '#F3F4F6', text: '#6B7280' },
     scheduled: { bg: '#FFFBEB', text: '#D97706' },
   }
-  const trialColor: Record<string, { bg: string; text: string }> = {
-    converted: { bg: '#ECFDF5', text: '#059669' },
-    lost:      { bg: '#FEF2F2', text: '#DC2626' },
-    pending:   { bg: '#FFFBEB', text: '#D97706' },
-  }
+
+  const inp = { padding: '9px 14px', border: '1.5px solid #E5E7EB', borderRadius: '8px', fontSize: '14px', fontFamily: 'inherit', outline: 'none' }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#111827', margin: 0 }}>Sessions</h1>
-          <p style={{ color: '#6B7280', fontSize: '14px', margin: '4px 0 0 0' }}>{sessions?.length ?? 0} total</p>
+          <p style={{ color: '#6B7280', fontSize: '14px', margin: '4px 0 0 0' }}>{sessions.length} total</p>
         </div>
-        <Link href="/admin/sessions/new" style={{ background: '#0D1B2A', color: '#E8C97A', padding: '10px 20px', borderRadius: '10px', textDecoration: 'none', fontWeight: '600', fontSize: '14px' }}>
-          + Log Session
-        </Link>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          {/* Teacher filter */}
+          <select style={{ ...inp, minWidth: '180px' }} value={selectedTeacher} onChange={e => setSelectedTeacher(e.target.value)}>
+            <option value="">All Teachers</option>
+            {teachers.map((t: any) => <option key={t.id} value={t.id}>{t.profile?.name}</option>)}
+          </select>
+          {selectedTeacher && (
+            <button onClick={() => setSelectedTeacher('')} style={{ background: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA', padding: '8px 14px', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', fontWeight: '500' }}>
+              Clear ✕
+            </button>
+          )}
+          <Link href="/admin/sessions/new" style={{ background: '#0D1B2A', color: '#E8C97A', padding: '10px 20px', borderRadius: '10px', textDecoration: 'none', fontWeight: '600', fontSize: '14px' }}>
+            + Log Session
+          </Link>
+        </div>
       </div>
 
       <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
@@ -55,13 +70,10 @@ export default async function SessionsPage() {
               </tr>
             </thead>
             <tbody>
-              {(sessions ?? []).length === 0 && (
-                <tr><td colSpan={10} style={{ textAlign: 'center', padding: '48px', color: '#9CA3AF' }}>No sessions yet. Log your first session!</td></tr>
-              )}
-              {(sessions ?? []).map((s: any) => {
-                const tc = typeColor[s.session_type] || { bg: '#F3F4F6', text: '#374151' }
+              {loading && <tr><td colSpan={10} style={{ textAlign: 'center', padding: '48px', color: '#9CA3AF' }}>Loading…</td></tr>}
+              {!loading && sessions.length === 0 && <tr><td colSpan={10} style={{ textAlign: 'center', padding: '48px', color: '#9CA3AF' }}>No sessions found</td></tr>}
+              {sessions.map((s: any) => {
                 const ac = attColor[s.attendance_status] || { bg: '#F3F4F6', text: '#374151' }
-                const trc = s.trial_status ? (trialColor[s.trial_status] || { bg: '#F3F4F6', text: '#374151' }) : null
                 return (
                   <tr key={s.id} style={{ borderBottom: '1px solid #F3F4F6' }}>
                     <td style={{ padding: '12px 16px', fontSize: '13px', color: '#374151', whiteSpace: 'nowrap' }}>
@@ -70,15 +82,11 @@ export default async function SessionsPage() {
                     </td>
                     <td style={{ padding: '12px 16px', fontWeight: '600', color: '#111827', fontSize: '14px' }}>{s.student?.name ?? '—'}</td>
                     <td style={{ padding: '12px 16px', color: '#374151', fontSize: '13px' }}>{s.teacher?.profile?.name ?? '—'}</td>
-                    <td style={{ padding: '12px 16px' }}>
-                      <span style={{ background: tc.bg, color: tc.text, padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>{s.session_type}</span>
-                    </td>
+                    <td style={{ padding: '12px 16px' }}><span style={{ background: s.session_type === 'trial' ? '#EFF6FF' : '#ECFDF5', color: s.session_type === 'trial' ? '#2563EB' : '#059669', padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '600' }}>{s.session_type}</span></td>
                     <td style={{ padding: '12px 16px', color: '#374151', fontSize: '13px' }}>{s.duration}m</td>
+                    <td style={{ padding: '12px 16px' }}><span style={{ background: ac.bg, color: ac.text, padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '600' }}>{s.attendance_status}</span></td>
                     <td style={{ padding: '12px 16px' }}>
-                      <span style={{ background: ac.bg, color: ac.text, padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>{s.attendance_status}</span>
-                    </td>
-                    <td style={{ padding: '12px 16px' }}>
-                      {trc ? <span style={{ background: trc.bg, color: trc.text, padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>{s.trial_status}</span> : <span style={{ color: '#D1D5DB' }}>—</span>}
+                      {s.trial_status ? <span style={{ background: s.trial_status === 'converted' ? '#ECFDF5' : s.trial_status === 'lost' ? '#FEF2F2' : '#FFFBEB', color: s.trial_status === 'converted' ? '#059669' : s.trial_status === 'lost' ? '#DC2626' : '#D97706', padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '600' }}>{s.trial_status}</span> : <span style={{ color: '#D1D5DB' }}>—</span>}
                     </td>
                     <td style={{ padding: '12px 16px', fontSize: '13px' }}>{s.student_rating ? '⭐'.repeat(s.student_rating) : '—'}</td>
                     <td style={{ padding: '12px 16px', fontSize: '13px' }}>{s.homework ? '✅' : '—'}</td>

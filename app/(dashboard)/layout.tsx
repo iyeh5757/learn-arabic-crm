@@ -1,110 +1,103 @@
 // app/(dashboard)/layout.tsx
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import Link from 'next/link'
+import { ReactNode } from 'react'
 
-export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+const NAV: Record<string, { label: string; href: string; emoji: string }[]> = {
+  admin: [
+    { label: 'Dashboard',  href: '/admin',            emoji: '📊' },
+    { label: 'Students',   href: '/admin/students',   emoji: '👨‍🎓' },
+    { label: 'Sessions',   href: '/admin/sessions',   emoji: '📅' },
+    { label: 'Payments',   href: '/admin/payments',   emoji: '💳' },
+    { label: 'Teachers',   href: '/admin/teachers',   emoji: '👩‍🏫' },
+    { label: 'Users',      href: '/admin/users',      emoji: '👥' },
+    { label: 'Reminders',  href: '/admin/reminders',  emoji: '🔔' },
+    { label: 'Reports',    href: '/admin/reports',    emoji: '📈' },
+  ],
+  teacher: [
+    { label: 'Dashboard',  href: '/teacher',           emoji: '📊' },
+    { label: 'My Students',href: '/teacher/students',  emoji: '👨‍🎓' },
+    { label: 'Sessions',   href: '/teacher/sessions',  emoji: '📅' },
+  ],
+  sales: [
+    { label: 'Dashboard',  href: '/sales',             emoji: '📊' },
+    { label: 'My Students',href: '/sales/students',    emoji: '👨‍🎓' },
+    { label: 'Payments',   href: '/sales/payments',    emoji: '💳' },
+    { label: 'Commissions',href: '/sales/commissions', emoji: '💰' },
+  ],
+  accountant: [
+    { label: 'Dashboard',  href: '/accountant',            emoji: '📊' },
+    { label: 'Renewals',   href: '/accountant/renewals',   emoji: '🔄' },
+    { label: 'Payments',   href: '/accountant/payments',   emoji: '💳' },
+    { label: 'Students',   href: '/accountant/students',   emoji: '👨‍🎓' },
+    { label: 'Reminders',  href: '/accountant/reminders',  emoji: '🔔' },
+  ],
+  supervisor: [
+    { label: 'Dashboard',  href: '/supervisor',          emoji: '📊' },
+    { label: 'Sessions',   href: '/supervisor/sessions', emoji: '📅' },
+    { label: 'Teachers',   href: '/supervisor/teachers', emoji: '👩‍🏫' },
+    { label: 'Trials',     href: '/supervisor/trials',   emoji: '🎯' },
+  ],
+}
+
+export default async function DashboardLayout({ children }: { children: ReactNode }) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('name, role')
+    .select('role, name')
     .eq('id', user.id)
     .single()
 
   if (!profile) redirect('/login')
 
-  const role = profile.role
-
-  const navLinks: Record<string, { label: string; href: string }[]> = {
-    admin: [
-      { label: 'Dashboard', href: '/admin' },
-      { label: 'Students', href: '/admin/students' },
-      { label: 'Sessions', href: '/admin/sessions' },
-      { label: 'Payments', href: '/admin/payments' },
-      { label: 'Teachers', href: '/admin/teachers' },
-      { label: 'Users', href: '/admin/users' },
-      { label: 'Reports', href: '/admin/reports' },
-    ],
-    teacher: [
-      { label: 'Dashboard', href: '/teacher' },
-      { label: 'My Students', href: '/teacher/students' },
-      { label: 'Sessions', href: '/teacher/sessions' },
-    ],
-    sales: [
-      { label: 'Dashboard', href: '/sales' },
-      { label: 'My Students', href: '/sales/students' },
-      { label: 'Payments', href: '/sales/payments' },
-      { label: 'Commissions', href: '/sales/commissions' },
-    ],
-    accountant: [
-      { label: 'Dashboard', href: '/accountant' },
-      { label: 'Renewals', href: '/accountant/renewals' },
-      { label: 'Payments', href: '/accountant/payments' },
-      { label: 'Students', href: '/accountant/students' },
-    ],
-    supervisor: [
-      { label: 'Dashboard', href: '/supervisor' },
-      { label: 'Sessions', href: '/supervisor/sessions' },
-      { label: 'Teachers', href: '/supervisor/teachers' },
-      { label: 'Trials', href: '/supervisor/trials' },
-    ],
-  }
-
-  const links = navLinks[role] ?? []
-
-  const ROLE_COLORS: Record<string, string> = {
-    admin: '#7C3AED', teacher: '#2563EB', sales: '#059669',
-    accountant: '#DC2626', supervisor: '#EA580C',
-  }
-  const roleColor = ROLE_COLORS[role] ?? '#6B7280'
+  const role = profile.role as string
+  const links = NAV[role] ?? []
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: '#F9FAFB' }}>
       {/* Sidebar */}
-      <aside style={{ width: '220px', background: '#0D1B2A', display: 'flex', flexDirection: 'column', flexShrink: 0, position: 'fixed', top: 0, left: 0, height: '100vh', zIndex: 10 }}>
-        <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '34px', height: '34px', background: 'rgba(201,168,76,0.15)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', color: '#E8C97A' }}>تعلم</div>
-            <div>
-              <p style={{ color: '#E8C97A', fontWeight: '700', fontSize: '14px', margin: 0 }}>Learn Arabic</p>
-              <p style={{ color: '#6B7280', fontSize: '11px', margin: 0 }}>CRM System</p>
-            </div>
-          </div>
+      <aside style={{ width: '220px', background: '#0D1B2A', display: 'flex', flexDirection: 'column', flexShrink: 0, position: 'sticky', top: 0, height: '100vh', overflowY: 'auto' }}>
+        {/* Logo */}
+        <div style={{ padding: '24px 20px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ fontFamily: 'serif', fontSize: '22px', color: '#C9A84C', marginBottom: '2px' }}>تعلم</div>
+          <div style={{ fontSize: '13px', fontWeight: '600', color: '#fff' }}>Learn Arabic</div>
+          <div style={{ fontSize: '10px', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.08em', marginTop: '2px' }}>{role}</div>
         </div>
 
-        <nav style={{ flex: 1, padding: '12px 0', overflowY: 'auto' }}>
+        {/* Nav links */}
+        <nav style={{ padding: '16px 12px', flex: 1 }}>
           {links.map(link => (
-            <a key={link.href} href={link.href}
-              style={{ display: 'block', padding: '10px 20px', color: '#D1D5DB', textDecoration: 'none', fontSize: '14px', fontWeight: '500' }}>
-              {link.label}
-            </a>
+            <Link key={link.href} href={link.href} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 12px', borderRadius: '8px', textDecoration: 'none', color: 'rgba(255,255,255,0.75)', fontSize: '14px', fontWeight: '500', marginBottom: '2px', transition: 'all 0.15s' }}
+              className="sidebar-link">
+              <span>{link.emoji}</span>
+              <span>{link.label}</span>
+            </Link>
           ))}
         </nav>
 
-        <div style={{ padding: '16px 20px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(201,168,76,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#E8C97A', fontWeight: '700', fontSize: '14px' }}>
-              {profile.name?.[0]?.toUpperCase()}
-            </div>
-            <div>
-              <p style={{ color: '#fff', fontSize: '13px', fontWeight: '600', margin: 0 }}>{profile.name}</p>
-              <span style={{ background: `${roleColor}33`, color: roleColor, padding: '1px 8px', borderRadius: '20px', fontSize: '10px', fontWeight: '600', textTransform: 'capitalize' as const }}>{role}</span>
-            </div>
-          </div>
+        {/* User + signout */}
+        <div style={{ padding: '16px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', marginBottom: '10px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{profile.name}</div>
           <form action="/api/auth/signout" method="POST">
-            <button type="submit" style={{ width: '100%', background: 'rgba(255,255,255,0.06)', color: '#9CA3AF', border: 'none', padding: '8px', borderRadius: '8px', fontSize: '13px', cursor: 'pointer' }}>
-              Sign out
+            <button type="submit" style={{ width: '100%', background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.6)', border: '1px solid rgba(255,255,255,0.1)', padding: '8px', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', fontWeight: '500' }}>
+              Sign Out
             </button>
           </form>
         </div>
       </aside>
 
       {/* Main content */}
-      <main style={{ marginLeft: '220px', flex: 1, padding: '28px', boxSizing: 'border-box' as const, minHeight: '100vh', background: '#F9FAFB' }}>
+      <main style={{ flex: 1, padding: '32px', overflowY: 'auto' }}>
         {children}
       </main>
+
+      <style>{`
+        .sidebar-link:hover { background: rgba(255,255,255,0.08); color: #E8C97A !important; }
+      `}</style>
     </div>
   )
 }

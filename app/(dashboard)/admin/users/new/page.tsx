@@ -1,21 +1,29 @@
 'use client'
 // app/(dashboard)/admin/users/new/page.tsx
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 
 const LANGUAGES = ['English','German','French','Spanish','Arabic','Italian','Dutch','Turkish','Russian']
 const SPECIALTIES = ['Egyptian','Gulf','Levantine','MSA','Quran','Islamic','Children']
 
 export default function NewUserPage() {
   const router = useRouter()
+  const supabase = createClient()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [supervisors, setSupervisors] = useState<any[]>([])
   const [form, setForm] = useState({
     name: '', email: '', password: '', role: 'sales',
     rate_per_session_usd: '', commission_amount: '', commission_currency: 'USD',
     languages: [] as string[], specialties: [] as string[],
+    supervisor_id: '',
   })
+
+  useEffect(() => {
+    supabase.from('profiles').select('id, name').eq('role', 'supervisor').eq('is_active', true).then(({ data }) => setSupervisors(data ?? []))
+  }, [])
 
   function toggle(arr: string[], val: string) {
     return arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val]
@@ -33,17 +41,10 @@ export default function NewUserPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       })
-
       let data: any = {}
       try { data = await res.json() } catch { data = { error: 'Server returned invalid response' } }
-
-      if (!res.ok) {
-        setError(data.error ?? `Server error: ${res.status} ${res.statusText}`)
-        setLoading(false)
-        return
-      }
-
-      setSuccess(`✅ ${form.name} has been created successfully!`)
+      if (!res.ok) { setError(data.error ?? `Error: ${res.status}`); setLoading(false); return }
+      setSuccess(`✅ ${form.name} created successfully!`)
       setLoading(false)
       setTimeout(() => router.push('/admin/users'), 1500)
     } catch (err: any) {
@@ -62,9 +63,7 @@ export default function NewUserPage() {
     <div style={{ maxWidth: '860px' }}>
       <div style={{ marginBottom: '24px' }}>
         <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#111827', margin: 0 }}>Create New User</h1>
-        <p style={{ color: '#6B7280', fontSize: '14px', margin: '4px 0 0 0' }}>Add a new team member to the system</p>
       </div>
-
       <form onSubmit={handleSubmit}>
         <div style={card}>
           <div style={cardH}>👤 Account Details</div>
@@ -88,11 +87,20 @@ export default function NewUserPage() {
           <div style={card}>
             <div style={cardH}>👩‍🏫 Teacher Configuration</div>
             <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ maxWidth: '260px' }}>
-                <label style={lbl}>Rate Per Session (USD) *</label>
-                <div style={{ position: 'relative' }}>
-                  <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6B7280' }}>$</span>
-                  <input type="number" step="0.01" min="0" style={{ ...inp, paddingLeft: '28px' }} value={form.rate_per_session_usd} onChange={e => setForm(f => ({...f, rate_per_session_usd: e.target.value}))} placeholder="e.g. 8.00" />
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                <div>
+                  <label style={lbl}>Rate Per Session (USD) *</label>
+                  <div style={{ position: 'relative' }}>
+                    <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6B7280' }}>$</span>
+                    <input type="number" step="0.01" min="0" style={{ ...inp, paddingLeft: '28px' }} value={form.rate_per_session_usd} onChange={e => setForm(f => ({...f, rate_per_session_usd: e.target.value}))} placeholder="e.g. 8.00" />
+                  </div>
+                </div>
+                <div>
+                  <label style={lbl}>Assigned Supervisor</label>
+                  <select style={inp} value={form.supervisor_id} onChange={e => setForm(f => ({...f, supervisor_id: e.target.value}))}>
+                    <option value="">No supervisor</option>
+                    {supervisors.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
                 </div>
               </div>
               <div>
@@ -125,41 +133,24 @@ export default function NewUserPage() {
           <div style={card}>
             <div style={cardH}>💰 Commission Configuration</div>
             <div style={grid}>
-              <div>
-                <label style={lbl}>Commission Amount Per Conversion</label>
-                <input type="number" step="0.01" min="0" style={inp} value={form.commission_amount} onChange={e => setForm(f => ({...f, commission_amount: e.target.value}))} placeholder="e.g. 10" />
-              </div>
-              <div>
-                <label style={lbl}>Commission Currency</label>
+              <div><label style={lbl}>Commission Amount Per Conversion</label><input type="number" step="0.01" min="0" style={inp} value={form.commission_amount} onChange={e => setForm(f => ({...f, commission_amount: e.target.value}))} placeholder="e.g. 10" /></div>
+              <div><label style={lbl}>Commission Currency</label>
                 <select style={inp} value={form.commission_currency} onChange={e => setForm(f => ({...f, commission_currency: e.target.value}))}>
-                  <option value="USD">USD</option>
-                  <option value="GBP">GBP</option>
-                  <option value="EUR">EUR</option>
-                  <option value="AED">AED</option>
+                  <option value="USD">USD</option><option value="GBP">GBP</option><option value="EUR">EUR</option><option value="AED">AED</option>
                 </select>
               </div>
             </div>
           </div>
         )}
 
-        {error && (
-          <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626', padding: '14px 16px', borderRadius: '8px', fontSize: '14px', marginBottom: '16px' }}>
-            <strong>Error:</strong> {error}
-          </div>
-        )}
-        {success && (
-          <div style={{ background: '#ECFDF5', border: '1px solid #6EE7B7', color: '#065F46', padding: '14px 16px', borderRadius: '8px', fontSize: '14px', marginBottom: '16px' }}>
-            {success}
-          </div>
-        )}
+        {error && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626', padding: '14px 16px', borderRadius: '8px', fontSize: '14px', marginBottom: '16px' }}><strong>Error:</strong> {error}</div>}
+        {success && <div style={{ background: '#ECFDF5', border: '1px solid #6EE7B7', color: '#065F46', padding: '14px 16px', borderRadius: '8px', fontSize: '14px', marginBottom: '16px' }}>{success}</div>}
 
         <div style={{ display: 'flex', gap: '12px' }}>
           <button type="submit" disabled={loading} style={{ background: '#0D1B2A', color: '#E8C97A', padding: '12px 28px', borderRadius: '10px', border: 'none', fontWeight: '600', fontSize: '14px', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}>
             {loading ? 'Creating…' : 'Create User'}
           </button>
-          <button type="button" onClick={() => router.back()} style={{ background: 'transparent', color: '#6B7280', padding: '12px 22px', borderRadius: '10px', border: '1.5px solid #E5E7EB', fontWeight: '500', fontSize: '14px', cursor: 'pointer' }}>
-            Cancel
-          </button>
+          <button type="button" onClick={() => router.back()} style={{ background: 'transparent', color: '#6B7280', padding: '12px 22px', borderRadius: '10px', border: '1.5px solid #E5E7EB', fontWeight: '500', fontSize: '14px', cursor: 'pointer' }}>Cancel</button>
         </div>
       </form>
     </div>
