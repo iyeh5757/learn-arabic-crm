@@ -1,0 +1,165 @@
+// app/(dashboard)/admin/reports/page.tsx
+import { createClient } from '@/lib/supabase/server'
+
+async function getEGPRate(): Promise<number> {
+  try {
+    const res = await fetch('https://open.er-api.com/v6/latest/USD', { next: { revalidate: 3600 } })
+    const data = await res.json()
+    return data?.rates?.EGP ?? 48.5
+  } catch { return 48.5 }
+}
+
+export default async function AdminReportsPage() {
+  const supabase = createClient()
+  const now = new Date()
+  const months = Array.from({ length: 6 }, (_, i) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    return { label: d.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }), start: d.toISOString().split('T')[0], end: new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split('T')[0] }
+  }).reverse()
+
+  const [
+    { data: allPayments },
+    { data: allSessions },
+    { data: allStudents },
+    { data: teachers },
+    egpRate,
+  ] = await Promise.all([
+    supabase.from('payments').select('amount, currency, status, created_at, payment_date'),
+    supabase.from('sessions').select('id, session_type, attendance_status, session_date, trial_status, duration'),
+    supabase.from('students').select('id, student_status, created_at, currency'),
+    supabase.from('teachers').select('id, rate_per_session_usd, profile:profiles!teachers_user_id_fkey(name), sessions(id, attendance_status, session_type, session_date, duration)').eq('is_active', true),
+    getEGPRate(),
+  ])
+
+  const totalStudents = allStudents?.length ?? 0
+  const activeStudents = allStudents?.filter(s => s.student_status === 'active').length ?? 0
+  const trialStudents = allStudents?.filter(s => s.student_status === 'trial').length ?? 0
+  const totalSessions = allSessions?.length ?? 0
+  const attendedSessions = allSessions?.filter(s => s.attendance_status === 'attended').length ?? 0
+  const noShows = allSessions?.filter(s => s.attendance_status === 'no-show').length ?? 0
+  const trialsConverted = allSessions?.filter(s => s.trial_status === 'converted').length ?? 0
+  const trialsLost = allSessions?.filter(s => s.trial_status === 'lost').length ?? 0
+  const conversionRate = trialsConverted + trialsLost > 0 ? Math.round((trialsConverted / (trialsConverted + trialsLost)) * 100) : 0
+
+  const totalRevenue = { USD: 0, GBP: 0, EUR: 0, AED: 0 }
+  allPayments?.filter(p => p.status === 'paid').forEach((p: any) => {
+    totalRevenue[p.currency as keyof typeof totalRevenue] = (totalRevenue[p.currency as keyof typeof totalRevenue] || 0) + Number(p.amount)
+  })
+
+  const totalTeacherCost = (teachers ?? []).reduce((acc: number, t: any) => {
+    const sessions = (t.sessions ?? []).filter((s: any) => s.session_type === 'paid' && s.attendance_status === 'attended').length
+    return acc + sessions * Number(t.rate_per_session_usd)
+  }, 0)
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <div>
+        <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#111827', margin: 0 }}>Reports & Analytics</h1>
+        <p style={{ color: '#6B7280', fontSize: '14px', margin: '4px 0 0 0' }}>All-time overview</p>
+      </div>
+
+      {/* Student Stats */}
+      <div>
+        <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#374151', margin: '0 0 12px 0' }}>👥 Students</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px' }}>
+          {[
+            { label: 'Total Students', value: totalStudents, color: '#2563EB', bg: '#EFF6FF' },
+            { label: 'Active', value: activeStudents, color: '#059669', bg: '#ECFDF5' },
+            { label: 'Trial', value: trialStudents, color: '#D97706', bg: '#FFFBEB' },
+            { label: 'Inactive', value: totalStudents - activeStudents - trialStudents, color: '#6B7280', bg: '#F3F4F6' },
+          ].map(k => (
+            <div key={k.label} style={{ background: '#fff', border: `1px solid ${k.bg}`, borderRadius: '12px', padding: '18px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+              <p style={{ fontSize: '11px', fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 8px 0' }}>{k.label}</p>
+              <p style={{ fontSize: '26px', fontWeight: '700', color: k.color, margin: 0 }}>{k.value}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Session Stats */}
+      <div>
+        <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#374151', margin: '0 0 12px 0' }}>📅 Sessions</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '12px' }}>
+          {[
+            { label: 'Total Sessions', value: totalSessions, color: '#7C3AED', bg: '#F3E8FF' },
+            { label: 'Attended', value: attendedSessions, color: '#059669', bg: '#ECFDF5' },
+            { label: 'No-Shows', value: noShows, color: '#DC2626', bg: '#FEF2F2' },
+            { label: 'Trials Converted', value: trialsConverted, color: '#059669', bg: '#ECFDF5' },
+            { label: 'Trials Lost', value: trialsLost, color: '#DC2626', bg: '#FEF2F2' },
+            { label: 'Conversion Rate', value: `${conversionRate}%`, color: '#2563EB', bg: '#EFF6FF' },
+          ].map(k => (
+            <div key={k.label} style={{ background: '#fff', border: `1px solid ${k.bg}`, borderRadius: '12px', padding: '18px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+              <p style={{ fontSize: '11px', fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 8px 0' }}>{k.label}</p>
+              <p style={{ fontSize: '26px', fontWeight: '700', color: k.color, margin: 0 }}>{k.value}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Revenue */}
+      <div>
+        <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#374151', margin: '0 0 12px 0' }}>💰 Revenue (All Time)</h2>
+        <div style={{ background: '#0D1B2A', borderRadius: '14px', padding: '20px 24px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '20px' }}>
+            {[
+              { cur: 'USD', sym: '$', val: totalRevenue.USD, flag: '🇺🇸' },
+              { cur: 'GBP', sym: '£', val: totalRevenue.GBP, flag: '🇬🇧' },
+              { cur: 'EUR', sym: '€', val: totalRevenue.EUR, flag: '🇪🇺' },
+              { cur: 'AED', sym: 'AED ', val: totalRevenue.AED, flag: '🇦🇪' },
+            ].map(r => (
+              <div key={r.cur}>
+                <p style={{ color: '#9CA3AF', fontSize: '12px', margin: '0 0 4px 0' }}>{r.flag} {r.cur}</p>
+                <p style={{ color: '#E8C97A', fontSize: '22px', fontWeight: '700', margin: 0 }}>{r.sym}{r.val.toLocaleString('en', { minimumFractionDigits: 2 })}</p>
+              </div>
+            ))}
+          </div>
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.1)', marginTop: '16px', paddingTop: '16px', display: 'flex', gap: '32px' }}>
+            <div>
+              <p style={{ color: '#9CA3AF', fontSize: '12px', margin: '0 0 4px 0' }}>Total Teacher Cost (USD)</p>
+              <p style={{ color: '#FC8181', fontSize: '18px', fontWeight: '700', margin: 0 }}>−${totalTeacherCost.toFixed(2)}</p>
+            </div>
+            <div>
+              <p style={{ color: '#9CA3AF', fontSize: '12px', margin: '0 0 4px 0' }}>Live EGP Rate</p>
+              <p style={{ color: '#fff', fontSize: '18px', fontWeight: '700', margin: 0 }}>1 USD = {egpRate.toFixed(2)} EGP</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Teacher performance */}
+      <div>
+        <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#374151', margin: '0 0 12px 0' }}>👩‍🏫 Teacher Performance (All Time)</h2>
+        <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '14px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead><tr style={{ background: '#F9FAFB' }}>
+                {['Teacher','Total Sessions','Paid Attended','Trials','Rate/Session','Total Earned (USD)','Total Earned (EGP)'].map(h => (
+                  <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{h}</th>
+                ))}
+              </tr></thead>
+              <tbody>
+                {(teachers ?? []).map((t: any) => {
+                  const allS = t.sessions ?? []
+                  const paid = allS.filter((s: any) => s.session_type === 'paid' && s.attendance_status === 'attended').length
+                  const trials = allS.filter((s: any) => s.session_type === 'trial').length
+                  const earned = paid * Number(t.rate_per_session_usd)
+                  return (
+                    <tr key={t.id} style={{ borderBottom: '1px solid #F3F4F6' }}>
+                      <td style={{ padding: '14px 16px', fontWeight: '600', color: '#111827', fontSize: '14px' }}>{t.profile?.name}</td>
+                      <td style={{ padding: '14px 16px', color: '#374151', textAlign: 'center' }}>{allS.length}</td>
+                      <td style={{ padding: '14px 16px', color: '#059669', fontWeight: '700', textAlign: 'center' }}>{paid}</td>
+                      <td style={{ padding: '14px 16px', color: '#2563EB', textAlign: 'center' }}>{trials}</td>
+                      <td style={{ padding: '14px 16px', color: '#374151' }}>${Number(t.rate_per_session_usd).toFixed(2)}</td>
+                      <td style={{ padding: '14px 16px', fontWeight: '700', color: '#111827' }}>${earned.toFixed(2)}</td>
+                      <td style={{ padding: '14px 16px', fontWeight: '700', color: '#059669' }}>EGP {Math.round(earned * egpRate).toLocaleString()}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
