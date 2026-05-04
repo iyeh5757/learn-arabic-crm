@@ -27,16 +27,29 @@ export default function NewUserPage() {
     if (form.password.length < 8) { setError('Password must be at least 8 characters'); return }
     setLoading(true); setError(''); setSuccess('')
 
-    const res = await fetch('/api/users', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    })
-    const data = await res.json()
-    if (!res.ok) { setError(data.error ?? 'Failed to create user'); setLoading(false); return }
-    setSuccess(`✅ ${form.name} has been created successfully!`)
-    setLoading(false)
-    setTimeout(() => router.push('/admin/users'), 1500)
+    try {
+      const res = await fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
+
+      let data: any = {}
+      try { data = await res.json() } catch { data = { error: 'Server returned invalid response' } }
+
+      if (!res.ok) {
+        setError(data.error ?? `Server error: ${res.status} ${res.statusText}`)
+        setLoading(false)
+        return
+      }
+
+      setSuccess(`✅ ${form.name} has been created successfully!`)
+      setLoading(false)
+      setTimeout(() => router.push('/admin/users'), 1500)
+    } catch (err: any) {
+      setError(`Network error: ${err.message}`)
+      setLoading(false)
+    }
   }
 
   const inp = { width: '100%', padding: '9px 14px', border: '1.5px solid #E5E7EB', borderRadius: '8px', fontSize: '14px', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' as const }
@@ -71,7 +84,6 @@ export default function NewUserPage() {
           </div>
         </div>
 
-        {/* Teacher config */}
         {form.role === 'teacher' && (
           <div style={card}>
             <div style={cardH}>👩‍🏫 Teacher Configuration</div>
@@ -80,7 +92,7 @@ export default function NewUserPage() {
                 <label style={lbl}>Rate Per Session (USD) *</label>
                 <div style={{ position: 'relative' }}>
                   <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6B7280' }}>$</span>
-                  <input type="number" step="0.01" min="0" style={{ ...inp, paddingLeft: '28px' }} value={form.rate_per_session_usd} onChange={e => setForm(f => ({...f, rate_per_session_usd: e.target.value}))} placeholder="e.g. 8.00" required />
+                  <input type="number" step="0.01" min="0" style={{ ...inp, paddingLeft: '28px' }} value={form.rate_per_session_usd} onChange={e => setForm(f => ({...f, rate_per_session_usd: e.target.value}))} placeholder="e.g. 8.00" />
                 </div>
               </div>
               <div>
@@ -109,7 +121,6 @@ export default function NewUserPage() {
           </div>
         )}
 
-        {/* Sales commission */}
         {form.role === 'sales' && (
           <div style={card}>
             <div style={cardH}>💰 Commission Configuration</div>
@@ -131,8 +142,16 @@ export default function NewUserPage() {
           </div>
         )}
 
-        {error && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626', padding: '12px 16px', borderRadius: '8px', fontSize: '14px', marginBottom: '16px' }}>{error}</div>}
-        {success && <div style={{ background: '#ECFDF5', border: '1px solid #6EE7B7', color: '#065F46', padding: '12px 16px', borderRadius: '8px', fontSize: '14px', marginBottom: '16px' }}>{success}</div>}
+        {error && (
+          <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626', padding: '14px 16px', borderRadius: '8px', fontSize: '14px', marginBottom: '16px' }}>
+            <strong>Error:</strong> {error}
+          </div>
+        )}
+        {success && (
+          <div style={{ background: '#ECFDF5', border: '1px solid #6EE7B7', color: '#065F46', padding: '14px 16px', borderRadius: '8px', fontSize: '14px', marginBottom: '16px' }}>
+            {success}
+          </div>
+        )}
 
         <div style={{ display: 'flex', gap: '12px' }}>
           <button type="submit" disabled={loading} style={{ background: '#0D1B2A', color: '#E8C97A', padding: '12px 28px', borderRadius: '10px', border: 'none', fontWeight: '600', fontSize: '14px', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}>
