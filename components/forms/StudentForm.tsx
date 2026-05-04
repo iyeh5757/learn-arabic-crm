@@ -53,7 +53,7 @@ export default function StudentForm({ teachers, salesAgents, student, redirectTo
 
   function handleCountryChange(country: string) {
     const currency = COUNTRY_CURRENCY[country] ?? 'USD'
-    setForm(f => ({ ...f, country, currency: currency as any }))
+    setForm(f => ({ ...f, country, currency }))
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -112,7 +112,7 @@ export default function StudentForm({ teachers, salesAgents, student, redirectTo
               <option value="">Select teacher</option>
               {teachers.map(t => (
                 <option key={t.id} value={t.id}>
-                  {t.profile?.name} — {t.specialties?.join(', ')} ({t.languages?.join(', ')})
+                  {t.profile?.name}
                 </option>
               ))}
             </select>
