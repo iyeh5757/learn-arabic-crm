@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import StatCard from '@/components/dashboard/StatCard'
 import Link from 'next/link'
-import { Users, BookOpen, DollarSign, Bell } from 'lucide-react'
+
 
 function getMonthRange(monthParam?: string | null) {
   const now = new Date()
@@ -112,11 +112,11 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
 
       {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '16px' }}>
-        <StatCard label="Active Students" value={activeCount} icon={Users} color="green" />
-        <StatCard label="Trial Students"  value={trialCount}  icon={Users} color="blue" />
-        <StatCard label="Paid Sessions"   value={teacherSessions?.length ?? 0} icon={BookOpen} color="blue" />
-        <StatCard label="Revenue EGP"     value={`EGP ${Math.round(totalEGP).toLocaleString()}`} icon={DollarSign} color="gold" />
-        <StatCard label="Needs Renewal"   value={needsRenewal.length} icon={Bell} color="red" />
+        <StatCard label="Active Students" value={activeCount} emoji="👨‍🎓" color="green" />
+        <StatCard label="Trial Students" value={trialCount} emoji="🎯" color="blue" />
+        <StatCard label="Paid Sessions" value={teacherSessions?.length ?? 0} emoji="📅" color="blue" />
+        <StatCard label="Revenue EGP"     value={`EGP ${Math.round(totalEGP).toLocaleString()}`} emoji="💰" color="gold" />
+        <StatCard label="Needs Renewal" value={needsRenewal.length} emoji="🔔" color="red" />
       </div>
 
       {/* Revenue by currency */}

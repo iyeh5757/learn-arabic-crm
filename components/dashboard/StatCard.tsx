@@ -1,44 +1,36 @@
-'use client'
 // components/dashboard/StatCard.tsx
-import { LucideIcon } from 'lucide-react'
+// Server-component safe — no function props
 
-const COLORS = {
-  blue:   { bg: 'bg-blue-50',   icon: 'text-blue-600',   border: 'border-blue-100' },
-  green:  { bg: 'bg-green-50',  icon: 'text-green-600',  border: 'border-green-100' },
-  orange: { bg: 'bg-orange-50', icon: 'text-orange-600', border: 'border-orange-100' },
-  purple: { bg: 'bg-purple-50', icon: 'text-purple-600', border: 'border-purple-100' },
-  gold:   { bg: 'bg-yellow-50', icon: 'text-yellow-600', border: 'border-yellow-100' },
-  red:    { bg: 'bg-red-50',    icon: 'text-red-600',    border: 'border-red-100' },
-}
-
-interface StatCardProps {
+interface Props {
   label: string
   value: string | number
-  icon: LucideIcon
-  color: keyof typeof COLORS
-  sub?: string
-  trend?: number
+  emoji?: string
+  color?: 'green' | 'blue' | 'red' | 'gold' | 'gray'
 }
 
-export default function StatCard({ label, value, icon: Icon, color, sub, trend }: StatCardProps) {
-  const c = COLORS[color]
+const colors = {
+  green: { bg: '#ECFDF5', text: '#059669', border: '#6EE7B7' },
+  blue:  { bg: '#EFF6FF', text: '#2563EB', border: '#93C5FD' },
+  red:   { bg: '#FEF2F2', text: '#DC2626', border: '#FECACA' },
+  gold:  { bg: '#FFFBEB', text: '#D97706', border: '#FDE68A' },
+  gray:  { bg: '#F9FAFB', text: '#374151', border: '#E5E7EB' },
+}
+
+export default function StatCard({ label, value, emoji, color = 'gray' }: Props) {
+  const c = colors[color]
   return (
-    <div className={`card p-5 border ${c.border}`}>
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{label}</p>
-          <p className="text-3xl font-bold text-gray-900 mt-1">{value}</p>
-          {sub && <p className="text-xs text-gray-500 mt-1">{sub}</p>}
-        </div>
-        <div className={`w-10 h-10 rounded-lg ${c.bg} flex items-center justify-center shrink-0`}>
-          <Icon size={20} className={c.icon} />
-        </div>
+    <div style={{
+      background: '#fff',
+      border: `1px solid ${c.border}`,
+      borderRadius: '14px',
+      padding: '20px',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+    }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <p style={{ fontSize: '11px', fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 10px 0' }}>{label}</p>
+        {emoji && <span style={{ fontSize: '18px' }}>{emoji}</span>}
       </div>
-      {trend !== undefined && (
-        <div className={`text-xs mt-2 font-medium ${trend >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-          {trend >= 0 ? '↑' : '↓'} {Math.abs(trend)}% vs last month
-        </div>
-      )}
+      <p style={{ fontSize: '26px', fontWeight: '700', color: c.text, margin: 0 }}>{value}</p>
     </div>
   )
 }
