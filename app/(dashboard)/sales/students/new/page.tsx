@@ -28,7 +28,7 @@ export default function SalesNewStudentPage() {
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id ?? ''))
-    supabase.from('teachers').select('id, specialties, languages, profile:profiles!teachers_user_id_fkey(name)').eq('is_active', true).then(({ data }) => setTeachers(data ?? []))
+    supabase.from('teachers').select('id, user_id, specialties, languages, profile:profiles!teachers_user_id_fkey(name)').eq('is_active', true).then(({ data }) => setTeachers(data ?? []))
   }, [])
 
   const totalClasses = classMode === 'preset' ? form.number_of_classes : (Number(form.custom_classes) || 0)
@@ -102,7 +102,7 @@ export default function SalesNewStudentPage() {
             <div><label style={lbl}>Assigned Teacher</label>
               <select style={inp} value={form.assigned_teacher_id} onChange={e=>setForm(f=>({...f,assigned_teacher_id:e.target.value}))}>
                 <option value="">Select teacher</option>
-                {teachers.map((t:any)=><option key={t.id} value={t.id}>{t.profile?.name}</option>)}
+                {teachers.map((t:any)=><option key={t.id} value={t.id}>{(t.profile as any)?.name || (Array.isArray(t.profile) ? (t.profile as any)[0]?.name : '') || 'Unknown Teacher'}</option>)}
               </select>
             </div>
             <div><label style={lbl}>Session Duration</label>
