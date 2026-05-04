@@ -67,7 +67,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
     existing.usd += Number(t.rate_per_session_usd)
     teacherMap.set(t.id, existing)
   })
-  const teacherEarnings = [...teacherMap.values()].sort((a, b) => b.usd - a.usd)
+  const teacherEarnings = Array.from(teacherMap.values()).sort((a, b) => b.usd - a.usd)
 
   const needsRenewal = (lowStudents ?? []).filter(s => (s.total_paid_classes - s.consumed_classes) <= 2)
   const activeCount  = allStudents?.filter(s => s.student_status === 'active').length ?? 0
