@@ -2,11 +2,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import StatCard from '@/components/dashboard/StatCard'
-import MonthPicker from '@/components/dashboard/MonthPicker'
 import Link from 'next/link'
-import { Users, BookOpen, DollarSign, TrendingUp, Bell } from 'lucide-react'
+import { Users, BookOpen, DollarSign, Bell } from 'lucide-react'
 
-// Helper: get month range from optional ?month=YYYY-MM param
 function getMonthRange(monthParam?: string | null) {
   const now = new Date()
   const base = monthParam ? new Date(`${monthParam}-01`) : new Date(now.getFullYear(), now.getMonth(), 1)
@@ -16,15 +14,24 @@ function getMonthRange(monthParam?: string | null) {
     start: start.toISOString().split('T')[0],
     end:   end.toISOString().split('T')[0],
     label: start.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }),
+    param: `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2,'0')}`,
+    isCurrentMonth: base.getFullYear() === now.getFullYear() && base.getMonth() === now.getMonth(),
   }
 }
 
-export default async function AdminDashboard({ searchParams }: { searchParams: { month?: string } }) {
+export default async function AdminDashboard({ searchParams }: { searchParams?: { month?: string } }) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { start, end, label } = getMonthRange(searchParams.month)
+  const { start, end, label, param, isCurrentMonth } = getMonthRange(searchParams?.month)
+
+  // Previous / next month params
+  const base = new Date(`${param}-01`)
+  const prevDate = new Date(base.getFullYear(), base.getMonth() - 1, 1)
+  const nextDate = new Date(base.getFullYear(), base.getMonth() + 1, 1)
+  const prevParam = `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2,'0')}`
+  const nextParam = `${nextDate.getFullYear()}-${String(nextDate.getMonth() + 1).padStart(2,'0')}`
 
   const [
     { data: allStudents },
@@ -34,30 +41,38 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
     { data: todayReminders },
   ] = await Promise.all([
     supabase.from('students').select('id, student_status'),
-    supabase.from('payments').select('amount, currency, number_of_classes').eq('status', 'paid')
-      .gte('payment_date', start).lte('payment_date', end),
-    supabase.from('sessions').select('teacher_id, duration, session_type, attendance_status, teacher:teachers(id, rate_per_session_usd, profile:profiles!teachers_user_id_fkey(name))')
+    supabase.from('payments').select('amount, currency').eq('status', 'paid').gte('payment_date', start).lte('payment_date', end),
+    supabase.from('sessions')
+      .select('teacher_id, teacher:teachers(id, rate_per_session_usd, profile:profiles!teachers_user_id_fkey(name))')
       .eq('session_type', 'paid').eq('attendance_status', 'attended')
       .gte('session_date', start).lte('session_date', end),
-    supabase.from('students').select('id, name, total_paid_classes, consumed_classes').neq('student_status', 'inactive').lte('total_paid_classes', 2),
+    supabase.from('students').select('id, name, total_paid_classes, consumed_classes').neq('student_status', 'inactive'),
     supabase.from('students').select('id, name').eq('reminder_date', new Date().toISOString().split('T')[0]),
   ])
 
   // Revenue by currency
-  const rev = { USD: 0, GBP: 0, EUR: 0, AED: 0 } as Record<string, number>
+  const rev: Record<string, number> = { USD: 0, GBP: 0, EUR: 0, AED: 0 }
   monthPayments?.forEach(p => { rev[p.currency] = (rev[p.currency] || 0) + Number(p.amount) })
 
-  // EGP rate (fetch live)
+  // EGP rate — safe fetch with fallback
   let egpRate = 50
   try {
-    const r = await fetch('https://api.exchangerate-api.com/v4/latest/USD', { next: { revalidate: 3600 } })
-    const d = await r.json()
-    egpRate = d.rates?.EGP ?? 50
-  } catch {}
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 3000)
+    const r = await fetch('https://api.exchangerate-api.com/v4/latest/USD', {
+      signal: controller.signal,
+      next: { revalidate: 3600 },
+    })
+    clearTimeout(timeout)
+    if (r.ok) {
+      const d = await r.json()
+      egpRate = Number(d?.rates?.EGP) || 50
+    }
+  } catch { /* use fallback 50 */ }
 
   const totalEGP = rev.USD * egpRate + rev.GBP * egpRate * 1.27 + rev.EUR * egpRate * 1.09 + rev.AED * egpRate * 0.27
 
-  // Teacher earnings
+  // Teacher earnings map
   const teacherMap = new Map<string, { name: string; sessions: number; usd: number }>()
   teacherSessions?.forEach((s: any) => {
     const t = s.teacher
@@ -70,8 +85,11 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
   const teacherEarnings = Array.from(teacherMap.values()).sort((a, b) => b.usd - a.usd)
 
   const needsRenewal = (lowStudents ?? []).filter(s => (s.total_paid_classes - s.consumed_classes) <= 2)
-  const activeCount  = allStudents?.filter(s => s.student_status === 'active').length ?? 0
-  const trialCount   = allStudents?.filter(s => s.student_status === 'trial').length ?? 0
+  const activeCount  = (allStudents ?? []).filter(s => s.student_status === 'active').length
+  const trialCount   = (allStudents ?? []).filter(s => s.student_status === 'trial').length
+
+  const card  = { background: '#fff', border: '1px solid #E5E7EB', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }
+  const cardH = { padding: '14px 22px', borderBottom: '1px solid #F3F4F6', fontWeight: '600' as const, fontSize: '15px', color: '#111827', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
@@ -79,12 +97,20 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#111827', margin: 0 }}>Admin Dashboard</h1>
-          <p style={{ color: '#6B7280', fontSize: '14px', margin: '4px 0 0 0' }}>Revenue & operations for {label}</p>
+          <p style={{ color: '#6B7280', fontSize: '14px', margin: '4px 0 0 0' }}>{label}</p>
         </div>
-        <MonthPicker />
+        {/* Inline month navigator — no client component needed */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fff', border: '1px solid #E5E7EB', borderRadius: '10px', padding: '6px 12px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+          <Link href={`/admin?month=${prevParam}`} style={{ textDecoration: 'none', color: '#6B7280', fontSize: '18px', lineHeight: 1, padding: '2px 6px' }}>‹</Link>
+          <span style={{ fontSize: '14px', fontWeight: '600', color: '#111827', minWidth: '130px', textAlign: 'center' }}>{label}</span>
+          <Link href={isCurrentMonth ? '/admin' : `/admin?month=${nextParam}`} style={{ textDecoration: 'none', color: isCurrentMonth ? '#D1D5DB' : '#6B7280', fontSize: '18px', lineHeight: 1, padding: '2px 6px', pointerEvents: isCurrentMonth ? 'none' : 'auto' }}>›</Link>
+          {!isCurrentMonth && (
+            <Link href="/admin" style={{ fontSize: '11px', fontWeight: '600', color: '#C9A84C', background: '#FFFBEB', border: '1px solid #FDE68A', padding: '3px 8px', borderRadius: '6px', textDecoration: 'none', marginLeft: '4px', whiteSpace: 'nowrap' }}>Today</Link>
+          )}
+        </div>
       </div>
 
-      {/* KPI row */}
+      {/* KPIs */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '16px' }}>
         <StatCard label="Active Students" value={activeCount} icon={Users} color="green" />
         <StatCard label="Trial Students"  value={trialCount}  icon={Users} color="blue" />
@@ -94,34 +120,29 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
       </div>
 
       {/* Revenue by currency */}
-      <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-        <div style={{ padding: '14px 22px', borderBottom: '1px solid #F3F4F6', fontWeight: '600', fontSize: '15px', color: '#111827', display: 'flex', justifyContent: 'space-between' }}>
+      <div style={card}>
+        <div style={cardH}>
           <span>💰 Revenue — {label}</span>
-          <span style={{ fontSize: '13px', color: '#6B7280', fontWeight: '400' }}>Rate: 1 USD = {egpRate.toFixed(1)} EGP</span>
+          <span style={{ fontSize: '12px', color: '#9CA3AF', fontWeight: '400' }}>1 USD ≈ {egpRate.toFixed(1)} EGP</span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 0 }}>
-          {[
-            { currency: 'USD', symbol: '$',   value: rev.USD },
-            { currency: 'GBP', symbol: '£',   value: rev.GBP },
-            { currency: 'EUR', symbol: '€',   value: rev.EUR },
-            { currency: 'AED', symbol: 'AED', value: rev.AED },
-          ].map(r => (
-            <div key={r.currency} style={{ padding: '20px', borderRight: '1px solid #F3F4F6' }}>
-              <p style={{ fontSize: '11px', fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 8px 0' }}>{r.currency}</p>
-              <p style={{ fontSize: '22px', fontWeight: '700', color: '#111827', margin: 0 }}>{r.symbol}{r.value.toFixed(2)}</p>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))' }}>
+          {[{ c: 'USD', s: '$' }, { c: 'GBP', s: '£' }, { c: 'EUR', s: '€' }, { c: 'AED', s: 'AED ' }].map(({ c, s }) => (
+            <div key={c} style={{ padding: '20px', borderRight: '1px solid #F3F4F6' }}>
+              <p style={{ fontSize: '11px', fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 6px 0' }}>{c}</p>
+              <p style={{ fontSize: '22px', fontWeight: '700', color: '#111827', margin: 0 }}>{s}{(rev[c] || 0).toFixed(2)}</p>
             </div>
           ))}
         </div>
-        <div style={{ padding: '16px 22px', borderTop: '1px solid #F3F4F6', background: '#F9FAFB' }}>
-          <span style={{ fontSize: '14px', color: '#6B7280' }}>Total in EGP: </span>
-          <span style={{ fontSize: '18px', fontWeight: '700', color: '#059669' }}>EGP {Math.round(totalEGP).toLocaleString()}</span>
+        <div style={{ padding: '14px 22px', borderTop: '1px solid #F3F4F6', background: '#F9FAFB', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontSize: '13px', color: '#6B7280' }}>Total in EGP</span>
+          <span style={{ fontSize: '20px', fontWeight: '700', color: '#059669' }}>EGP {Math.round(totalEGP).toLocaleString()}</span>
         </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
         {/* Teacher earnings */}
-        <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-          <div style={{ padding: '14px 22px', borderBottom: '1px solid #F3F4F6', fontWeight: '600', fontSize: '15px', color: '#111827' }}>👩‍🏫 Teacher Earnings — {label}</div>
+        <div style={card}>
+          <div style={cardH}><span>👩‍🏫 Teacher Earnings</span></div>
           {teacherEarnings.length === 0
             ? <p style={{ padding: '24px', color: '#9CA3AF', textAlign: 'center', margin: 0 }}>No paid sessions this month</p>
             : <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
@@ -133,7 +154,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
                     </div>
                     <div style={{ textAlign: 'right' }}>
                       <p style={{ fontWeight: '700', color: '#059669', margin: 0 }}>${t.usd.toFixed(2)}</p>
-                      <p style={{ color: '#9CA3AF', fontSize: '11px', margin: '2px 0 0 0' }}>EGP {Math.round(t.usd * egpRate).toLocaleString()}</p>
+                      <p style={{ color: '#9CA3AF', fontSize: '11px', margin: '2px 0 0 0' }}>≈ EGP {Math.round(t.usd * egpRate).toLocaleString()}</p>
                     </div>
                   </div>
                 ))}
@@ -142,8 +163,8 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
         </div>
 
         {/* Renewal alerts */}
-        <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
-          <div style={{ padding: '14px 22px', borderBottom: '1px solid #F3F4F6', fontWeight: '600', fontSize: '15px', color: '#111827', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={card}>
+          <div style={cardH}>
             <span>🔔 Needs Renewal</span>
             <Link href="/admin/reminders" style={{ fontSize: '12px', color: '#C9A84C', textDecoration: 'none', fontWeight: '500' }}>View all →</Link>
           </div>
@@ -165,9 +186,9 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
       </div>
 
       {(todayReminders?.length ?? 0) > 0 && (
-        <div style={{ background: '#EFF6FF', border: '1px solid #93C5FD', borderRadius: '14px', padding: '16px 20px' }}>
-          <p style={{ fontWeight: '700', color: '#1E40AF', margin: '0 0 8px 0' }}>🔔 {todayReminders?.length} reminder(s) set for today</p>
-          <Link href="/admin/reminders" style={{ color: '#2563EB', fontSize: '14px', fontWeight: '500' }}>View Reminders →</Link>
+        <div style={{ background: '#EFF6FF', border: '1px solid #93C5FD', borderRadius: '14px', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <p style={{ fontWeight: '600', color: '#1E40AF', margin: 0 }}>🔔 {todayReminders?.length} reminder(s) set for today</p>
+          <Link href="/admin/reminders" style={{ color: '#2563EB', fontSize: '14px', fontWeight: '600', textDecoration: 'none' }}>View →</Link>
         </div>
       )}
     </div>
