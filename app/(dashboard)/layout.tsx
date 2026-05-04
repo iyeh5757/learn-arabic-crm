@@ -9,62 +9,112 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, name, email, role, is_active')
+    .select('name, role')
     .eq('id', user.id)
     .single()
 
   if (!profile) redirect('/login')
 
+  const role = profile.role
+
+  // Role-based nav links
+  const navLinks: Record<string, { label: string; href: string }[]> = {
+    admin: [
+      { label: 'Dashboard', href: '/admin' },
+      { label: 'Students', href: '/admin/students' },
+      { label: 'Sessions', href: '/admin/sessions' },
+      { label: 'Payments', href: '/admin/payments' },
+      { label: 'Teachers', href: '/admin/teachers' },
+      { label: 'Users', href: '/admin/users' },
+      { label: 'Reports', href: '/admin/reports' },
+    ],
+    teacher: [
+      { label: 'Dashboard', href: '/teacher' },
+      { label: 'My Students', href: '/teacher/students' },
+      { label: 'Sessions', href: '/teacher/sessions' },
+    ],
+    sales: [
+      { label: 'Dashboard', href: '/sales' },
+      { label: 'My Students', href: '/sales/students' },
+      { label: 'Payments', href: '/sales/payments' },
+      { label: 'Commissions', href: '/sales/commissions' },
+    ],
+    accountant: [
+      { label: 'Dashboard', href: '/accountant' },
+      { label: 'Renewals', href: '/accountant/renewals' },
+      { label: 'Payments', href: '/accountant/payments' },
+      { label: 'Students', href: '/accountant/students' },
+    ],
+    supervisor: [
+      { label: 'Dashboard', href: '/supervisor' },
+      { label: 'Sessions', href: '/supervisor/sessions' },
+      { label: 'Teachers', href: '/supervisor/teachers' },
+      { label: 'Trials', href: '/supervisor/trials' },
+    ],
+  }
+
+  const links = navLinks[role] ?? []
+
+  const ROLE_COLORS: Record<string, string> = {
+    admin: '#7C3AED', teacher: '#2563EB', sales: '#059669',
+    accountant: '#DC2626', supervisor: '#EA580C',
+  }
+  const roleColor = ROLE_COLORS[role] ?? '#6B7280'
+
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden">
-      {/* Simple sidebar for now */}
-      <aside className="w-64 flex flex-col bg-[#0D1B2A] text-white shrink-0">
-        <div className="px-6 py-5 border-b border-white/10">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl text-[#C9A84C]">تعلم</span>
-            <div>
-              <p className="font-bold text-sm text-white">Learn Arabic</p>
-              <p className="text-xs text-gray-400">CRM System</p>
+    <html lang="en">
+      <body style={{ margin: 0, fontFamily: 'system-ui, sans-serif', background: '#F9FAFB' }}>
+        <div style={{ display: 'flex', minHeight: '100vh' }}>
+          {/* Sidebar */}
+          <aside style={{ width: '220px', background: '#0D1B2A', display: 'flex', flexDirection: 'column', flexShrink: 0, position: 'fixed', top: 0, left: 0, height: '100vh', zIndex: 10 }}>
+            {/* Logo */}
+            <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '34px', height: '34px', background: 'rgba(201,168,76,0.15)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '18px' }}>تعلم</div>
+                <div>
+                  <p style={{ color: '#E8C97A', fontWeight: '700', fontSize: '14px', margin: 0 }}>Learn Arabic</p>
+                  <p style={{ color: '#6B7280', fontSize: '11px', margin: 0 }}>CRM System</p>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-        <nav className="flex-1 px-3 py-4 space-y-1">
-          <a href="/admin" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-400 hover:bg-white/5 hover:text-white">
-            Dashboard
-          </a>
-          <a href="/admin/users" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-400 hover:bg-white/5 hover:text-white">
-            Users
-          </a>
-          <a href="/admin/students" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-400 hover:bg-white/5 hover:text-white">
-            Students
-          </a>
-          <a href="/admin/sessions" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-400 hover:bg-white/5 hover:text-white">
-            Sessions
-          </a>
-          <a href="/admin/payments" className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-400 hover:bg-white/5 hover:text-white">
-            Payments
-          </a>
-        </nav>
-        <div className="px-4 py-4 border-t border-white/10">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-8 h-8 rounded-full bg-[#C9A84C]/20 flex items-center justify-center text-[#C9A84C] font-bold text-sm">
-              {profile.name[0].toUpperCase()}
+
+            {/* Nav */}
+            <nav style={{ flex: 1, padding: '12px 0', overflowY: 'auto' }}>
+              {links.map(link => (
+                <a key={link.href} href={link.href}
+                  style={{ display: 'block', padding: '10px 20px', color: '#D1D5DB', textDecoration: 'none', fontSize: '14px', fontWeight: '500', transition: 'background 0.15s' }}
+                  onMouseOver={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
+                  onMouseOut={e => (e.currentTarget.style.background = 'transparent')}>
+                  {link.label}
+                </a>
+              ))}
+            </nav>
+
+            {/* User info */}
+            <div style={{ padding: '16px 20px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(201,168,76,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#E8C97A', fontWeight: '700', fontSize: '14px' }}>
+                  {profile.name?.[0]?.toUpperCase()}
+                </div>
+                <div>
+                  <p style={{ color: '#fff', fontSize: '13px', fontWeight: '600', margin: 0 }}>{profile.name}</p>
+                  <span style={{ background: `${roleColor}22`, color: roleColor, padding: '1px 8px', borderRadius: '20px', fontSize: '10px', fontWeight: '600', textTransform: 'capitalize' }}>{role}</span>
+                </div>
+              </div>
+              <form action="/api/auth/signout" method="POST">
+                <button type="submit" style={{ width: '100%', background: 'rgba(255,255,255,0.06)', color: '#9CA3AF', border: 'none', padding: '8px', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', textAlign: 'center' }}>
+                  Sign out
+                </button>
+              </form>
             </div>
-            <div>
-              <p className="text-sm font-semibold text-white">{profile.name}</p>
-              <span className="text-xs text-gray-400 capitalize">{profile.role}</span>
-            </div>
-          </div>
-          <a href="/api/auth/signout" className="flex items-center gap-2 w-full px-3 py-2 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg text-sm">
-            Sign out
-          </a>
+          </aside>
+
+          {/* Main content */}
+          <main style={{ marginLeft: '220px', flex: 1, padding: '28px', maxWidth: '100%', boxSizing: 'border-box' }}>
+            {children}
+          </main>
         </div>
-      </aside>
-      <main className="flex-1 overflow-auto">
-        <div className="p-6 max-w-screen-2xl mx-auto">
-          {children}
-        </div>
-      </main>
-    </div>
+      </body>
+    </html>
   )
 }
