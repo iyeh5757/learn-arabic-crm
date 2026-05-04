@@ -102,7 +102,7 @@ export default function SalesNewStudentPage() {
             <div><label style={lbl}>Assigned Teacher</label>
               <select style={inp} value={form.assigned_teacher_id} onChange={e=>setForm(f=>({...f,assigned_teacher_id:e.target.value}))}>
                 <option value="">Select teacher</option>
-                {teachers.map((t:any)=><option key={t.id} value={t.id}>{t.profile?.name} — {(t.specialties??[]).join(', ')} ({(t.languages??[]).join(', ')})</option>)}
+                {teachers.map((t:any)=><option key={t.id} value={t.id}>{t.profile?.name}</option>)}
               </select>
             </div>
             <div><label style={lbl}>Session Duration</label>
