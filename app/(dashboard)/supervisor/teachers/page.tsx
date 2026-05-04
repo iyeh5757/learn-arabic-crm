@@ -39,7 +39,7 @@ export default async function SupervisorTeachersPage() {
                 <p style={{ fontWeight: '700', color: '#fff', margin: 0, fontSize: '16px' }}>{t.profile?.name}</p>
                 <p style={{ color: '#9CA3AF', fontSize: '12px', margin: '2px 0 0 0' }}>{(t.specialties ?? []).join(', ')} · {(t.languages ?? []).join(', ')}</p>
               </div>
-              <div style={{ display: 'flex', gap: '12px', text: 'right' }}>
+              <div style={{ display: 'flex', gap: '12px', textAlign: 'right' }}>
                 <div style={{ textAlign: 'center' }}>
                   <p style={{ color: '#9CA3AF', fontSize: '10px', margin: '0 0 2px 0', textTransform: 'uppercase' }}>Sessions/Mo</p>
                   <p style={{ color: '#E8C97A', fontSize: '18px', fontWeight: '700', margin: 0 }}>{monthSessions.length}</p>
