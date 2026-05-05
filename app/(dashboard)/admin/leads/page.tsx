@@ -26,13 +26,15 @@ export default function AdminLeadsPipelinePage() {
   const [agents, setAgents] = useState<any[]>([])
   const [filter, setFilter] = useState({ status: '', agent: '', search: '' })
   const [assigning, setAssigning] = useState<string | null>(null)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   async function load() {
     const supabase = createClient()
     const [{ data: l }, { data: a }] = await Promise.all([
       supabase.from('leads')
-        .select('*, assigned_agent:profiles!leads_assigned_to_fkey(id, name), logs:lead_contact_logs(id, log_date, note, attempt_number)')
+        .select('*, assigned_agent:profiles!leads_assigned_to_fkey(id, name), logs:lead_contact_logs(id, log_date, note, attempt_number, call_1, call_2, whatsapp_sent)')
         .order('created_at', { ascending: false }),
       supabase.from('profiles').select('id, name').eq('role', 'sales').eq('is_active', true),
     ])
@@ -49,16 +51,24 @@ export default function AdminLeadsPipelinePage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ assigned_to: agentId || null }),
     })
-    setLeads(prev => prev.map(l => l.id === leadId
-      ? { ...l, assigned_agent: agents.find(a => a.id === agentId) || null }
-      : l
-    ))
     setAssigning(null)
+    load()
+  }
+
+  async function handleDelete(leadId: string, name: string) {
+    if (!confirm(`Delete lead "${name}"? This cannot be undone.`)) return
+    setDeleting(leadId)
+    const supabase = createClient()
+    await supabase.from('lead_contact_logs').delete().eq('lead_id', leadId)
+    await supabase.from('leads').delete().eq('id', leadId)
+    setLeads(prev => prev.filter(l => l.id !== leadId))
+    setDeleting(null)
   }
 
   const filtered = leads.filter(l => {
     if (filter.status && l.status !== filter.status) return false
-    if (filter.agent && l.assigned_to !== filter.agent) return false
+    if (filter.agent === 'unassigned' && l.assigned_to) return false
+    if (filter.agent && filter.agent !== 'unassigned' && l.assigned_to !== filter.agent) return false
     if (filter.search) {
       const q = filter.search.toLowerCase()
       if (!l.name?.toLowerCase().includes(q) && !l.email?.toLowerCase().includes(q) && !l.phone?.includes(q)) return false
@@ -66,7 +76,6 @@ export default function AdminLeadsPipelinePage() {
     return true
   })
 
-  // Stats
   const stats = {
     total: leads.length,
     new: leads.filter(l => l.status === 'new').length,
@@ -74,7 +83,9 @@ export default function AdminLeadsPipelinePage() {
     cold: leads.filter(l => l.status === 'cold').length,
     converted: leads.filter(l => l.status === 'converted').length,
     trial: leads.filter(l => l.status === 'trial_scheduled').length,
-    reflag: leads.filter(l => l.status === 'cold' && l.cold_since && (new Date().getTime() - new Date(l.cold_since).getTime()) >= 7 * 86400000).length,
+    unassigned: leads.filter(l => !l.assigned_to).length,
+    reflag: leads.filter(l => l.status === 'cold' && l.cold_since &&
+      (new Date().getTime() - new Date(l.cold_since).getTime()) >= 7 * 86400000).length,
   }
 
   if (loading) return <div style={{ padding: '32px', color: '#6B7280' }}>Loading leads…</div>
@@ -84,30 +95,31 @@ export default function AdminLeadsPipelinePage() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
         <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#111827' }}>Leads Pipeline</h1>
         <a href="/admin/leads/upload" style={{ padding: '10px 20px', background: '#0D1B2A', color: '#E8C97A', borderRadius: '10px', fontWeight: '600', fontSize: '13px', textDecoration: 'none' }}>
-          + Upload Leads
+          📤 Upload Leads
         </a>
       </div>
 
       {/* Stats */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '12px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: '10px' }}>
         {[
-          { label: 'Total', value: stats.total, color: '#2563EB' },
-          { label: 'New', value: stats.new, color: '#0891B2' },
-          { label: 'In Pipeline', value: stats.attempting, color: '#D97706' },
-          { label: 'Trials', value: stats.trial, color: '#0F766E' },
-          { label: 'Converted', value: stats.converted, color: '#059669' },
-          { label: 'Cold', value: stats.cold, color: '#6B7280' },
-          { label: '⚑ Re-flag', value: stats.reflag, color: '#DC2626' },
+          { label: 'Total',      value: stats.total,      color: '#2563EB' },
+          { label: 'New',        value: stats.new,        color: '#0891B2' },
+          { label: 'In Pipeline',value: stats.attempting, color: '#D97706' },
+          { label: 'Trials',     value: stats.trial,      color: '#0F766E' },
+          { label: 'Converted',  value: stats.converted,  color: '#059669' },
+          { label: 'Cold',       value: stats.cold,       color: '#6B7280' },
+          { label: 'Unassigned', value: stats.unassigned, color: '#DC2626' },
+          { label: '⚑ Re-flag',  value: stats.reflag,    color: '#DC2626' },
         ].map(s => (
-          <div key={s.label} style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '16px', textAlign: 'center' }}>
-            <div style={{ fontSize: '24px', fontWeight: '700', color: s.color }}>{s.value}</div>
-            <div style={{ fontSize: '11px', color: '#6B7280', marginTop: '2px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{s.label}</div>
+          <div key={s.label} style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '14px', textAlign: 'center' }}>
+            <div style={{ fontSize: '22px', fontWeight: '700', color: s.color }}>{s.value}</div>
+            <div style={{ fontSize: '10px', color: '#6B7280', marginTop: '2px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{s.label}</div>
           </div>
         ))}
       </div>
 
       {/* Filters */}
-      <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '16px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+      <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '14px', display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
         <input placeholder="Search name, email, phone…" value={filter.search}
           onChange={e => setFilter(f => ({ ...f, search: e.target.value }))}
           style={{ flex: 1, minWidth: '180px', padding: '8px 12px', border: '1.5px solid #E5E7EB', borderRadius: '8px', fontSize: '13px' }} />
@@ -119,7 +131,7 @@ export default function AdminLeadsPipelinePage() {
         <select value={filter.agent} onChange={e => setFilter(f => ({ ...f, agent: e.target.value }))}
           style={{ padding: '8px 12px', border: '1.5px solid #E5E7EB', borderRadius: '8px', fontSize: '13px' }}>
           <option value="">All Agents</option>
-          <option value="unassigned">Unassigned</option>
+          <option value="unassigned">⚑ Unassigned</option>
           {agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
         </select>
         <span style={{ padding: '8px 14px', background: '#F3F4F6', borderRadius: '8px', fontSize: '13px', color: '#374151', fontWeight: '600' }}>
@@ -133,7 +145,7 @@ export default function AdminLeadsPipelinePage() {
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ background: '#F9FAFB' }}>
-                {['Name','Phone','Country','Wants','For','Status','Stage','Agent','Last Contact','Actions'].map(h => (
+                {['Name','Phone','Country','Wants','For','Status','Stage','Assigned To','Last Contact','Actions'].map(h => (
                   <th key={h} style={{ padding: '11px 14px', textAlign: 'left', fontSize: '11px', fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
@@ -144,61 +156,139 @@ export default function AdminLeadsPipelinePage() {
               )}
               {filtered.map(lead => {
                 const sc = STATUS_COLORS[lead.status] ?? { bg: '#F3F4F6', text: '#374151' }
-                const lastLog = lead.logs?.sort((a: any, b: any) => new Date(b.log_date).getTime() - new Date(a.log_date).getTime())[0]
-                const isColdReflag = lead.status === 'cold' && lead.cold_since && (new Date().getTime() - new Date(lead.cold_since).getTime()) >= 7 * 86400000
+                const lastLog = lead.logs?.sort((a: any, b: any) =>
+                  new Date(b.log_date).getTime() - new Date(a.log_date).getTime())[0]
+                const isColdReflag = lead.status === 'cold' && lead.cold_since &&
+                  (new Date().getTime() - new Date(lead.cold_since).getTime()) >= 7 * 86400000
+                const isExpanded = expandedId === lead.id
+                const allLogs = lead.logs?.sort((a: any, b: any) =>
+                  new Date(b.log_date).getTime() - new Date(a.log_date).getTime()) ?? []
+
                 return (
-                  <tr key={lead.id} style={{ borderBottom: '1px solid #F3F4F6', background: isColdReflag ? '#FEF2F2' : 'transparent' }}>
-                    <td style={{ padding: '12px 14px' }}>
-                      <div style={{ fontWeight: '600', color: '#111827', fontSize: '13px' }}>{lead.name}</div>
-                      <div style={{ fontSize: '11px', color: '#9CA3AF' }}>{lead.email || '—'}</div>
-                    </td>
-                    <td style={{ padding: '12px 14px', fontSize: '13px', color: '#374151' }}>{lead.phone || '—'}</td>
-                    <td style={{ padding: '12px 14px', fontSize: '13px', color: '#374151' }}>{lead.country || '—'}</td>
-                    <td style={{ padding: '12px 14px', fontSize: '12px', color: '#374151' }}>{lead.want_to_learn || '—'}</td>
-                    <td style={{ padding: '12px 14px', fontSize: '12px', color: '#374151' }}>{lead.for_whom || '—'}</td>
-                    <td style={{ padding: '12px 14px' }}>
-                      <span style={{ background: sc.bg, color: sc.text, padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '600', whiteSpace: 'nowrap' }}>
-                        {isColdReflag ? '⚑ Re-flag' : lead.status.replace(/_/g, ' ')}
-                      </span>
-                    </td>
-                    <td style={{ padding: '12px 14px', fontSize: '12px', color: '#6B7280' }}>
-                      {STAGE_LABELS[lead.pipeline_stage] ?? `Stage ${lead.pipeline_stage}`}
-                    </td>
-                    <td style={{ padding: '12px 14px' }}>
-                      {assigning === lead.id ? (
+                  <>
+                    <tr key={lead.id} style={{ borderBottom: isExpanded ? 'none' : '1px solid #F3F4F6', background: isColdReflag ? '#FEF9F9' : isExpanded ? '#FAFAFA' : 'transparent' }}>
+                      <td style={{ padding: '12px 14px' }}>
+                        <div style={{ fontWeight: '600', color: '#111827', fontSize: '13px' }}>{lead.name}</div>
+                        <div style={{ fontSize: '11px', color: '#9CA3AF' }}>{lead.email || ''}</div>
+                      </td>
+                      <td style={{ padding: '12px 14px', fontSize: '13px', color: '#374151' }}>{lead.phone || '—'}</td>
+                      <td style={{ padding: '12px 14px', fontSize: '13px', color: '#374151' }}>{lead.country || '—'}</td>
+                      <td style={{ padding: '12px 14px', fontSize: '12px' }}>
+                        <span style={{ background: '#EFF6FF', color: '#2563EB', padding: '2px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '600' }}>
+                          {lead.want_to_learn || '—'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px 14px', fontSize: '12px', color: '#6B7280' }}>{lead.for_whom || '—'}</td>
+                      <td style={{ padding: '12px 14px' }}>
+                        <span style={{ background: sc.bg, color: sc.text, padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '600', whiteSpace: 'nowrap' }}>
+                          {isColdReflag ? '⚑ Re-flag' : lead.status?.replace(/_/g, ' ')}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px 14px', fontSize: '12px', color: '#6B7280' }}>
+                        {STAGE_LABELS[lead.pipeline_stage] ?? `Stage ${lead.pipeline_stage}`}
+                      </td>
+                      <td style={{ padding: '12px 14px' }}>
+                        {assigning === lead.id ? (
+                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                            <select
+                              defaultValue={lead.assigned_to || ''}
+                              onChange={e => handleAssign(lead.id, e.target.value)}
+                              style={{ fontSize: '12px', padding: '4px 8px', border: '1.5px solid #C9A84C', borderRadius: '6px' }}>
+                              <option value="">Unassigned</option>
+                              {agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                            </select>
+                            <button onClick={() => setAssigning(null)}
+                              style={{ fontSize: '11px', padding: '4px 8px', border: '1px solid #E5E7EB', borderRadius: '6px', cursor: 'pointer', background: '#fff' }}>✕</button>
+                          </div>
+                        ) : (
+                          <button onClick={() => setAssigning(lead.id)}
+                            style={{ fontSize: '12px', color: lead.assigned_agent ? '#2563EB' : '#DC2626', background: lead.assigned_agent ? '#EFF6FF' : '#FEF2F2', border: 'none', borderRadius: '6px', padding: '4px 10px', cursor: 'pointer', fontWeight: '600' }}>
+                            {lead.assigned_agent?.name || '⚑ Assign'}
+                          </button>
+                        )}
+                      </td>
+                      <td style={{ padding: '12px 14px', fontSize: '11px', color: '#9CA3AF' }}>
+                        {lastLog ? new Date(lastLog.log_date).toLocaleDateString() : 'Never'}
+                      </td>
+                      <td style={{ padding: '12px 14px' }}>
                         <div style={{ display: 'flex', gap: '6px' }}>
-                          <select defaultValue={lead.assigned_to || ''}
-                            onChange={e => handleAssign(lead.id, e.target.value)}
-                            style={{ fontSize: '12px', padding: '4px 8px', border: '1px solid #E5E7EB', borderRadius: '6px' }}>
-                            <option value="">Unassigned</option>
-                            {agents.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                          </select>
-                          <button onClick={() => setAssigning(null)} style={{ fontSize: '11px', padding: '4px 8px', border: '1px solid #E5E7EB', borderRadius: '6px', cursor: 'pointer' }}>✕</button>
+                          <button
+                            onClick={() => setExpandedId(isExpanded ? null : lead.id)}
+                            style={{ padding: '5px 10px', background: isExpanded ? '#F3F4F6' : '#EFF6FF', color: isExpanded ? '#374151' : '#2563EB', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer' }}>
+                            {isExpanded ? 'Close' : 'View'}
+                          </button>
+                          <button
+                            onClick={() => handleDelete(lead.id, lead.name)}
+                            disabled={deleting === lead.id}
+                            style={{ padding: '5px 10px', background: '#FEF2F2', color: '#DC2626', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', opacity: deleting === lead.id ? 0.5 : 1 }}>
+                            {deleting === lead.id ? '…' : 'Delete'}
+                          </button>
                         </div>
-                      ) : (
-                        <button onClick={() => setAssigning(lead.id)}
-                          style={{ fontSize: '12px', color: lead.assigned_agent ? '#374151' : '#DC2626', background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: '500' }}>
-                          {lead.assigned_agent?.name || '⚑ Unassigned'}
-                        </button>
-                      )}
-                    </td>
-                    <td style={{ padding: '12px 14px', fontSize: '11px', color: '#9CA3AF' }}>
-                      {lastLog ? (
-                        <div>
-                          <div>{new Date(lastLog.log_date).toLocaleDateString()}</div>
-                          {lastLog.note && <div style={{ color: '#6B7280', maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lastLog.note}</div>}
-                        </div>
-                      ) : 'Never'}
-                    </td>
-                    <td style={{ padding: '12px 14px' }}>
-                      <div style={{ display: 'flex', gap: '6px' }}>
-                        <a href={`/admin/leads/${lead.id}`}
-                          style={{ padding: '4px 10px', background: '#EFF6FF', color: '#2563EB', borderRadius: '6px', fontSize: '11px', fontWeight: '600', textDecoration: 'none' }}>
-                          View
-                        </a>
-                      </div>
-                    </td>
-                  </tr>
+                      </td>
+                    </tr>
+
+                    {/* Expanded view — contact log history */}
+                    {isExpanded && (
+                      <tr key={lead.id + '-expanded'}>
+                        <td colSpan={10} style={{ padding: '0', background: '#FAFAFA', borderBottom: '1px solid #E5E7EB' }}>
+                          <div style={{ padding: '16px 20px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
+                              <div>
+                                <div style={{ fontSize: '11px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase', marginBottom: '4px' }}>Submitted</div>
+                                <div style={{ fontSize: '13px', color: '#111827' }}>{lead.submitted_date ? new Date(lead.submitted_date).toLocaleDateString() : '—'}</div>
+                              </div>
+                              <div>
+                                <div style={{ fontSize: '11px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase', marginBottom: '4px' }}>For Whom</div>
+                                <div style={{ fontSize: '13px', color: '#111827' }}>{lead.for_whom || '—'}</div>
+                              </div>
+                              <div>
+                                <div style={{ fontSize: '11px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase', marginBottom: '4px' }}>Email</div>
+                                <div style={{ fontSize: '13px', color: '#111827' }}>{lead.email || '—'}</div>
+                              </div>
+                            </div>
+
+                            {allLogs.length === 0 ? (
+                              <div style={{ color: '#9CA3AF', fontSize: '13px', padding: '12px', background: '#fff', borderRadius: '8px', border: '1px solid #F3F4F6' }}>
+                                No contact attempts logged yet.
+                              </div>
+                            ) : (
+                              <div>
+                                <div style={{ fontSize: '11px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase', marginBottom: '8px' }}>Contact Log ({allLogs.length} attempts)</div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                  {allLogs.map((log: any) => (
+                                    <div key={log.id} style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '10px', padding: '12px 16px', display: 'flex', gap: '20px', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                                      <div style={{ minWidth: '80px' }}>
+                                        <div style={{ fontSize: '10px', color: '#9CA3AF', fontWeight: '600' }}>Attempt {log.attempt_number}</div>
+                                        <div style={{ fontSize: '12px', color: '#374151', fontWeight: '600' }}>{new Date(log.log_date).toLocaleDateString()}</div>
+                                      </div>
+                                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                        <span style={{ background: log.call_1 === 'answered' ? '#ECFDF5' : log.call_1 === 'no_answer' ? '#FEF2F2' : '#F3F4F6', color: log.call_1 === 'answered' ? '#059669' : log.call_1 === 'no_answer' ? '#DC2626' : '#6B7280', padding: '2px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '600' }}>
+                                          Call 1: {log.call_1?.replace('_', ' ') || '—'}
+                                        </span>
+                                        <span style={{ background: log.call_2 === 'answered' ? '#ECFDF5' : log.call_2 === 'no_answer' ? '#FEF2F2' : '#F3F4F6', color: log.call_2 === 'answered' ? '#059669' : log.call_2 === 'no_answer' ? '#DC2626' : '#6B7280', padding: '2px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '600' }}>
+                                          Call 2: {log.call_2?.replace('_', ' ') || '—'}
+                                        </span>
+                                        {log.whatsapp_sent && (
+                                          <span style={{ background: '#ECFDF5', color: '#059669', padding: '2px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '600' }}>
+                                            WhatsApp ✓
+                                          </span>
+                                        )}
+                                      </div>
+                                      {log.note && (
+                                        <div style={{ flex: 1, minWidth: '200px', fontSize: '12px', color: '#374151', fontStyle: 'italic' }}>
+                                          "{log.note}"
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </>
                 )
               })}
             </tbody>
