@@ -132,7 +132,8 @@ export default function SalesLeadsPage() {
         submitted_date, created_at, updated_at,
         logs:lead_contact_logs(
           id, log_date, note, outcome, whatsapp_sent, attempt_number,
-          logged_by_profile:profiles!lead_contact_logs_logged_by_fkey(name)
+          call_1, call_2,
+          agent:profiles!lead_contact_logs_agent_id_fkey(name)
         )
       `)
       .eq('assigned_to', user.id)          // ← only MY leads
@@ -165,13 +166,13 @@ export default function SalesLeadsPage() {
 
     // Insert log
     await supabase.from('lead_contact_logs').insert({
-      lead_id:       leadId,
-      logged_by:     userId,
-      outcome:       logForm.outcome,
-      note:          logForm.note || null,
-      whatsapp_sent: logForm.whatsapp_sent,
+      lead_id:        leadId,
+      agent_id:       userId,
+      outcome:        logForm.outcome,
+      note:           logForm.note || null,
+      whatsapp_sent:  logForm.whatsapp_sent,
       attempt_number: attemptNumber,
-      log_date:      new Date().toISOString(),
+      log_date:       new Date().toISOString().split('T')[0],
     })
 
     // Update lead status
