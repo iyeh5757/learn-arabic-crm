@@ -142,7 +142,7 @@ export default async function AdminReportsPage() {
                   const paidSessionsArr = allS.filter((s: any) => s.session_type === 'paid' && s.attendance_status === 'attended')
                   const paid = paidSessionsArr.length
                   const trials = allS.filter((s: any) => s.session_type === 'trial').length
-                  const earned = paidSessions.reduce((sum: number, s: any) => sum + Number(t.rate_per_session_usd) * ((s.duration ?? 60) / 60), 0)
+                  const earned = paidSessionsArr.reduce((sum: number, s: any) => sum + Number(t.rate_per_session_usd) * ((s.duration ?? 60) / 60), 0)
                   return (
                     <tr key={t.id} style={{ borderBottom: '1px solid #F3F4F6' }}>
                       <td style={{ padding: '14px 16px', fontWeight: '600', color: '#111827', fontSize: '14px' }}>{t.profile?.name}</td>
