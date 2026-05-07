@@ -11,7 +11,7 @@ export default async function AdminTeachersPage() {
       id, rate_per_session_usd, languages, specialties, is_active,
       profile:profiles!teachers_user_id_fkey(id, name, email, is_active),
       students:students(id, student_status),
-      sessions:sessions(id, session_type, attendance_status, session_date)
+      sessions:sessions(id, session_type, attendance_status, session_date, duration)
     `)
     .order('is_active', { ascending: false })
 
@@ -34,10 +34,11 @@ export default async function AdminTeachersPage() {
         {(teachers ?? []).map((t: any) => {
           const activeStudents = (t.students ?? []).filter((s: any) => s.student_status === 'active').length
           const trialStudents = (t.students ?? []).filter((s: any) => s.student_status === 'trial').length
-          const monthSessions = (t.sessions ?? []).filter((s: any) =>
+          const monthSessionsList = (t.sessions ?? []).filter((s: any) =>
             s.session_type === 'paid' && s.attendance_status === 'attended' && s.session_date >= monthStart
-          ).length
-          const earningsUSD = monthSessions * Number(t.rate_per_session_usd)
+          )
+          const monthSessions = monthSessionsList.length
+          const earningsUSD = monthSessionsList.reduce((acc: number, s: any) => acc + Number(t.rate_per_session_usd) * ((s.duration ?? 60) / 60), 0)
 
           return (
             <div key={t.id} style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', opacity: t.is_active ? 1 : 0.6 }}>
