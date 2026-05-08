@@ -34,11 +34,16 @@ export default async function AdminTeachersPage() {
         {(teachers ?? []).map((t: any) => {
           const activeStudents = (t.students ?? []).filter((s: any) => s.student_status === 'active').length
           const trialStudents = (t.students ?? []).filter((s: any) => s.student_status === 'trial').length
-          const monthSessionsList = (t.sessions ?? []).filter((s: any) =>
-            s.session_type === 'paid' && s.attendance_status === 'attended' && s.session_date >= monthStart
+          const monthAttended = (t.sessions ?? []).filter((s: any) =>
+            s.attendance_status === 'attended' && s.session_date >= monthStart &&
+            (s.session_type === 'paid' || s.session_type === 'trial')
           )
-          const monthSessions = monthSessionsList.length
-          const earningsUSD = monthSessionsList.reduce((acc: number, s: any) => acc + Number(t.rate_per_session_usd) * ((s.duration ?? 60) / 60), 0)
+          const monthSessions = monthAttended.filter((s: any) => s.session_type === 'paid').length
+          const monthTrials = monthAttended.filter((s: any) => s.session_type === 'trial').length
+          const earningsUSD = monthAttended.reduce((acc: number, s: any) => {
+            if (s.session_type === 'trial') return acc + ((s.duration ?? 60) >= 60 ? 5 : 3)
+            return acc + Number(t.rate_per_session_usd) * ((s.duration ?? 60) / 60)
+          }, 0)
 
           return (
             <div key={t.id} style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.08)', opacity: t.is_active ? 1 : 0.6 }}>

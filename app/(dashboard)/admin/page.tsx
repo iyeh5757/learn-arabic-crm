@@ -43,8 +43,8 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
     supabase.from('students').select('id, student_status'),
     supabase.from('payments').select('amount, currency').eq('status', 'paid').gte('payment_date', start).lte('payment_date', end),
     supabase.from('sessions')
-      .select('teacher_id, duration, teacher:teachers(id, rate_per_session_usd, profile:profiles!teachers_user_id_fkey(name))')
-      .eq('session_type', 'paid').eq('attendance_status', 'attended')
+      .select('teacher_id, duration, session_type, teacher:teachers(id, rate_per_session_usd, profile:profiles!teachers_user_id_fkey(name))')
+      .in('session_type', ['paid', 'trial']).eq('attendance_status', 'attended')
       .gte('session_date', start).lte('session_date', end),
     supabase.from('students').select('id, name, total_paid_classes, consumed_classes').neq('student_status', 'inactive'),
     supabase.from('students').select('id, name').eq('reminder_date', new Date().toISOString().split('T')[0]),
@@ -77,9 +77,14 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
   teacherSessions?.forEach((s: any) => {
     const t = s.teacher
     if (!t) return
-    const existing = teacherMap.get(t.id) ?? { name: t.profile?.name ?? '?', sessions: 0, usd: 0 }
+    const existing = teacherMap.get(t.id) ?? { name: t.profile?.name ?? '?', sessions: 0, trials: 0, usd: 0 }
     existing.sessions++
-    existing.usd += Number(t.rate_per_session_usd) * ((s.duration ?? 60) / 60)
+    if (s.session_type === 'trial') {
+      existing.usd += (s.duration ?? 60) >= 60 ? 5 : 3
+      existing.trials = (existing.trials ?? 0) + 1
+    } else {
+      existing.usd += Number(t.rate_per_session_usd) * ((s.duration ?? 60) / 60)
+    }
     teacherMap.set(t.id, existing)
   })
   const teacherEarnings = Array.from(teacherMap.values()).sort((a, b) => b.usd - a.usd)
