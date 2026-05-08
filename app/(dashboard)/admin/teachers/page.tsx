@@ -11,7 +11,7 @@ export default async function AdminTeachersPage() {
       id, rate_per_session_usd, languages, specialties, is_active,
       profile:profiles!teachers_user_id_fkey(id, name, email, is_active),
       students:students(id, student_status),
-      sessions:sessions(id, session_type, attendance_status, session_date, duration)
+      sessions:sessions(id, session_type, attendance_status, session_date, duration, student:students(student_status))
     `)
     .order('is_active', { ascending: false })
 
@@ -39,9 +39,12 @@ export default async function AdminTeachersPage() {
             (s.session_type === 'paid' || s.session_type === 'trial')
           )
           const monthSessions = monthAttended.filter((s: any) => s.session_type === 'paid').length
-          const monthTrials = monthAttended.filter((s: any) => s.session_type === 'trial').length
+          const monthTrials = monthAttended.filter((s: any) => s.session_type === 'trial' && s.student?.student_status === 'active').length
           const earningsUSD = monthAttended.reduce((acc: number, s: any) => {
-            if (s.session_type === 'trial') return acc + ((s.duration ?? 60) >= 60 ? 5 : 3)
+            if (s.session_type === 'trial') {
+              if (s.student?.student_status !== 'active') return acc
+              return acc + ((s.duration ?? 60) >= 60 ? 5 : 3)
+            }
             return acc + Number(t.rate_per_session_usd) * ((s.duration ?? 60) / 60)
           }, 0)
 

@@ -29,13 +29,13 @@ export default async function TeacherDashboard() {
     { data: recentSessions },
   ] = await Promise.all([
     supabase.from('students').select('id, name, student_status, total_paid_classes, consumed_classes, session_duration').eq('assigned_teacher_id', teacher.id).order('name'),
-    supabase.from('sessions').select('id, attendance_status, session_type, duration, session_date, trial_status').eq('teacher_id', teacher.id),
+    supabase.from('sessions').select('id, attendance_status, session_type, duration, session_date, trial_status, student:students(student_status)').eq('teacher_id', teacher.id),
     supabase.from('sessions').select('*, student:students(name)').eq('teacher_id', teacher.id).order('session_date', { ascending: false }).limit(8),
   ])
 
   const monthSessions = (allSessions ?? []).filter(s => s.session_date >= monthStart)
   const attendedPaid = monthSessions.filter((s: any) => s.session_type === 'paid' && s.attendance_status === 'attended')
-  const attendedTrials = monthSessions.filter((s: any) => s.session_type === 'trial' && s.attendance_status === 'attended')
+  const attendedTrials = monthSessions.filter((s: any) => s.session_type === 'trial' && s.attendance_status === 'attended' && s.student?.student_status === 'active')
   const totalHours = attendedPaid.reduce((acc: number, s: any) => acc + ((s.duration ?? 60) / 60), 0)
   const earningsUSD = attendedPaid.reduce((acc: number, s: any) => acc + Number(teacher.rate_per_session_usd) * ((s.duration ?? 60) / 60), 0)
     + attendedTrials.reduce((acc: number, s: any) => acc + ((s.duration ?? 60) >= 60 ? 5 : 3), 0)
