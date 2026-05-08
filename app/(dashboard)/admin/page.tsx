@@ -77,7 +77,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
   teacherSessions?.forEach((s: any) => {
     const t = s.teacher
     if (!t) return
-    const existing = teacherMap.get(t.id) ?? { name: t.profile?.name ?? '?', sessions: 0, trials: 0, usd: 0 }
+    const existing: { name: string; sessions: number; trials: number; usd: number } = teacherMap.get(t.id) ?? { name: t.profile?.name ?? 'Unknown', sessions: 0, trials: 0, usd: 0 }
     existing.sessions++
     if (s.session_type === 'trial') {
       existing.usd += (s.duration ?? 60) >= 60 ? 5 : 3
