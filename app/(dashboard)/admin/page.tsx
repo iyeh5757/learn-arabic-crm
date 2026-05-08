@@ -73,11 +73,11 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
   const totalEGP = rev.USD * egpRate + rev.GBP * egpRate * 1.27 + rev.EUR * egpRate * 1.09 + rev.AED * egpRate * 0.27
 
   // Teacher earnings map
-  const teacherMap = new Map<string, { name: string; sessions: number; usd: number }>()
+  const teacherMap = new Map<string, { name: string; sessions: number; trials: number; usd: number }>()
   teacherSessions?.forEach((s: any) => {
     const t = s.teacher
     if (!t) return
-    const existing: { name: string; sessions: number; trials: number; usd: number } = teacherMap.get(t.id) ?? { name: t.profile?.name ?? 'Unknown', sessions: 0, trials: 0, usd: 0 }
+    const existing = teacherMap.get(t.id) ?? { name: t.profile?.name ?? 'Unknown', sessions: 0, trials: 0, usd: 0 }
     existing.sessions++
     if (s.session_type === 'trial') {
       existing.usd += (s.duration ?? 60) >= 60 ? 5 : 3
