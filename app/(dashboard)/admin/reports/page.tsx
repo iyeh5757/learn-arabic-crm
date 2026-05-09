@@ -176,7 +176,7 @@ export default async function AdminReportsPage() {
       <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '16px', overflow: 'hidden' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #E5E7EB', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#111827', margin: 0 }}>👥 Students by Sales Agent</h2>
-          <span style={{ fontSize: '12px', color: '#6B7280' }}>{(students ?? []).length} total students</span>
+          <span style={{ fontSize: '12px', color: '#6B7280' }}>{(allStudents ?? []).length} total students</span>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
           {agentRows.map((agent: any) => {
@@ -264,7 +264,7 @@ export default async function AdminReportsPage() {
           const rows = Object.values(byAgent).sort((a: any, b: any) => b.total - a.total)
           if (!rows.length) return <p style={{ padding: '24px', color: '#9CA3AF', textAlign: 'center', margin: 0 }}>No commissions this period</p>
           // Students grouped by sales agent
-  const studentsByAgent = (students ?? []).reduce((acc: Record<string, any>, s: any) => {
+  const studentsByAgent = (allStudents ?? []).reduce((acc: Record<string, any>, s: any) => {
     const agentId = s.added_by_sales?.id ?? 'unassigned'
     const agentName = s.added_by_sales?.name ?? 'Unassigned'
     if (!acc[agentId]) acc[agentId] = { name: agentName, students: [] }
