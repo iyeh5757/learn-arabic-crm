@@ -27,7 +27,7 @@ export default async function AdminReportsPage() {
   ] = await Promise.all([
     supabase.from('payments').select('amount, currency, status, created_at, payment_date'),
     supabase.from('sessions').select('id, session_type, attendance_status, session_date, trial_status, duration'),
-    supabase.from('students').select('id, student_status, created_at, currency'),
+    supabase.from('students').select('id, name, student_status, created_at, currency, payment_status, total_paid_classes, consumed_classes, added_by_sales:profiles!students_added_by_sales_id_fkey(id, name)'),
     supabase.from('teachers').select('id, rate_per_session_usd, profile:profiles!teachers_user_id_fkey(name), sessions(id, attendance_status, session_type, session_date, duration, student:students(student_status))').eq('is_active', true),
     getEGPRate(),
     supabase.from('commissions').select('amount, currency, status, created_at, sales_user:profiles!commissions_sales_user_id_fkey(name), student:students(name)').order('created_at', { ascending: false }),
@@ -172,6 +172,79 @@ export default async function AdminReportsPage() {
         </div>
       </div>
 
+      {/* Students by Sales Agent */}
+      <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '16px', overflow: 'hidden' }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid #E5E7EB', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#111827', margin: 0 }}>👥 Students by Sales Agent</h2>
+          <span style={{ fontSize: '12px', color: '#6B7280' }}>{(students ?? []).length} total students</span>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+          {agentRows.map((agent: any) => {
+            const active = agent.students.filter((s: any) => s.student_status === 'active').length
+            const trial = agent.students.filter((s: any) => s.student_status === 'trial').length
+            const inactive = agent.students.filter((s: any) => s.student_status === 'inactive').length
+            const pendingPay = agent.students.filter((s: any) => s.payment_status === 'pending').length
+            return (
+              <details key={agent.name} style={{ borderBottom: '1px solid #F3F4F6' }}>
+                <summary style={{ padding: '14px 20px', cursor: 'pointer', listStyle: 'none', display: 'flex', alignItems: 'center', gap: '14px', userSelect: 'none' }}>
+                  <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#0D1B2A', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#C9A84C', fontWeight: '700', fontSize: '13px', flexShrink: 0 }}>
+                    {agent.name[0].toUpperCase()}
+                  </div>
+                  <span style={{ fontWeight: '700', color: '#111827', fontSize: '14px', flex: 1 }}>{agent.name}</span>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <span style={{ background: '#ECFDF5', color: '#059669', padding: '2px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '600' }}>{active} active</span>
+                    <span style={{ background: '#FFF7ED', color: '#C2410C', padding: '2px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '600' }}>{trial} trial</span>
+                    <span style={{ background: '#F3F4F6', color: '#6B7280', padding: '2px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '600' }}>{inactive} inactive</span>
+                    {pendingPay > 0 && <span style={{ background: '#FEF2F2', color: '#DC2626', padding: '2px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '600' }}>{pendingPay} pending payment</span>}
+                    <span style={{ background: '#F0F9FF', color: '#0369A1', padding: '2px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '700' }}>{agent.students.length} total ▾</span>
+                  </div>
+                </summary>
+                <div style={{ padding: '0 20px 16px', overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                    <thead>
+                      <tr style={{ background: '#F9FAFB' }}>
+                        {['Name', 'Status', 'Payment', 'Classes Remaining', 'Currency', 'Joined'].map(h => (
+                          <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: '600', color: '#6B7280', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {agent.students.map((s: any) => {
+                        const remaining = (s.total_paid_classes ?? 0) - (s.consumed_classes ?? 0)
+                        return (
+                          <tr key={s.id} style={{ borderBottom: '1px solid #F9FAFB' }}>
+                            <td style={{ padding: '8px 12px', fontWeight: '600', color: '#111827' }}>{s.name}</td>
+                            <td style={{ padding: '8px 12px' }}>
+                              <span style={{
+                                background: s.student_status === 'active' ? '#ECFDF5' : s.student_status === 'trial' ? '#FFF7ED' : '#F3F4F6',
+                                color: s.student_status === 'active' ? '#059669' : s.student_status === 'trial' ? '#C2410C' : '#6B7280',
+                                padding: '2px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: '600', textTransform: 'capitalize'
+                              }}>{s.student_status}</span>
+                            </td>
+                            <td style={{ padding: '8px 12px' }}>
+                              <span style={{
+                                background: s.payment_status === 'pending' ? '#FEF2F2' : '#ECFDF5',
+                                color: s.payment_status === 'pending' ? '#DC2626' : '#059669',
+                                padding: '2px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: '600', textTransform: 'capitalize'
+                              }}>{s.payment_status ?? '—'}</span>
+                            </td>
+                            <td style={{ padding: '8px 12px', color: remaining <= 0 ? '#DC2626' : remaining <= 2 ? '#D97706' : '#374151', fontWeight: remaining <= 2 ? '700' : '400' }}>
+                              {remaining <= 0 ? '⚠️ 0' : remaining}
+                            </td>
+                            <td style={{ padding: '8px 12px', color: '#6B7280' }}>{s.currency}</td>
+                            <td style={{ padding: '8px 12px', color: '#9CA3AF' }}>{s.created_at ? new Date(s.created_at).toLocaleDateString() : '—'}</td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            )
+          })}
+        </div>
+      </div>
+
       {/* Sales Commissions */}
       <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '16px', overflow: 'hidden' }}>
         <div style={{ padding: '16px 20px', borderBottom: '1px solid #E5E7EB', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -190,7 +263,17 @@ export default async function AdminReportsPage() {
           }, {})
           const rows = Object.values(byAgent).sort((a: any, b: any) => b.total - a.total)
           if (!rows.length) return <p style={{ padding: '24px', color: '#9CA3AF', textAlign: 'center', margin: 0 }}>No commissions this period</p>
-          return (
+          // Students grouped by sales agent
+  const studentsByAgent = (students ?? []).reduce((acc: Record<string, any>, s: any) => {
+    const agentId = s.added_by_sales?.id ?? 'unassigned'
+    const agentName = s.added_by_sales?.name ?? 'Unassigned'
+    if (!acc[agentId]) acc[agentId] = { name: agentName, students: [] }
+    acc[agentId].students.push(s)
+    return acc
+  }, {})
+  const agentRows = Object.values(studentsByAgent).sort((a: any, b: any) => b.students.length - a.students.length)
+
+    return (
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: '#F9FAFB' }}>
