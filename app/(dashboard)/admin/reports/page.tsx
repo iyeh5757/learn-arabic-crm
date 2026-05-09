@@ -59,6 +59,17 @@ export default async function AdminReportsPage() {
     }, 0)
   }, 0)
 
+
+  // Students grouped by sales agent
+  const studentsByAgent = (allStudents ?? []).reduce((acc: Record<string, any>, s: any) => {
+    const agentId = s.added_by_sales?.id ?? 'unassigned'
+    const agentName = s.added_by_sales?.name ?? 'Unassigned'
+    if (!acc[agentId]) acc[agentId] = { name: agentName, students: [] }
+    acc[agentId].students.push(s)
+    return acc
+  }, {})
+  const agentRows = Object.values(studentsByAgent).sort((a: any, b: any) => b.students.length - a.students.length)
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       <div>
@@ -263,17 +274,7 @@ export default async function AdminReportsPage() {
           }, {})
           const rows = Object.values(byAgent).sort((a: any, b: any) => b.total - a.total)
           if (!rows.length) return <p style={{ padding: '24px', color: '#9CA3AF', textAlign: 'center', margin: 0 }}>No commissions this period</p>
-          // Students grouped by sales agent
-  const studentsByAgent = (allStudents ?? []).reduce((acc: Record<string, any>, s: any) => {
-    const agentId = s.added_by_sales?.id ?? 'unassigned'
-    const agentName = s.added_by_sales?.name ?? 'Unassigned'
-    if (!acc[agentId]) acc[agentId] = { name: agentName, students: [] }
-    acc[agentId].students.push(s)
-    return acc
-  }, {})
-  const agentRows = Object.values(studentsByAgent).sort((a: any, b: any) => b.students.length - a.students.length)
-
-    return (
+            return (
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead>
                 <tr style={{ background: '#F9FAFB' }}>
