@@ -48,6 +48,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
       .gte('session_date', start).lte('session_date', end),
     supabase.from('students').select('id, name, total_paid_classes, consumed_classes').neq('student_status', 'inactive'),
     supabase.from('students').select('id, name').eq('reminder_date', new Date().toISOString().split('T')[0]),
+    supabase.from('commissions').select('amount, currency, status, sales_user:profiles!commissions_sales_user_id_fkey(name)').gte('created_at', start).lte('created_at', end),
   ])
 
   // Revenue by currency
@@ -91,6 +92,17 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
     teacherMap.set(t.id, existing)
   })
   const teacherEarnings = Array.from(teacherMap.values()).sort((a, b) => b.usd - a.usd)
+
+  // Commissions by agent
+  const commissionsByAgent = (commissions ?? []).reduce((acc: Record<string, {name: string; count: number; total: number; currency: string; pending: number}>, c: any) => {
+    const name = c.sales_user?.name ?? 'Unknown'
+    if (!acc[name]) acc[name] = { name, count: 0, total: 0, currency: c.currency ?? 'USD', pending: 0 }
+    acc[name].count++
+    acc[name].total += Number(c.amount)
+    if (c.status === 'pending') acc[name].pending++
+    return acc
+  }, {})
+  const commissionRows = Object.values(commissionsByAgent).sort((a: any, b: any) => b.total - a.total)
 
   const needsRenewal = (lowStudents ?? []).filter(s => (s.total_paid_classes - s.consumed_classes) <= 2)
   const activeCount  = (allStudents ?? []).filter(s => s.student_status === 'active').length
@@ -192,6 +204,42 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
           }
         </div>
       </div>
+
+      {/* Sales Commissions Section */}
+      {commissionRows.length > 0 && (
+        <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+          <div style={{ background: '#0D1B2A', padding: '14px 22px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ color: '#E8C97A', fontWeight: '700', fontSize: '15px' }}>💰 Sales Commissions — {label}</span>
+            <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>{(commissions ?? []).length} total</span>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: '#F9FAFB' }}>
+                  {['Agent', 'Conversions', 'Total Commission', 'Pending Payout'].map(h => (
+                    <th key={h} style={{ padding: '10px 18px', textAlign: 'left', fontSize: '11px', fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #E5E7EB' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {commissionRows.map((r: any) => (
+                  <tr key={r.name} style={{ borderBottom: '1px solid #F9FAFB' }}>
+                    <td style={{ padding: '13px 18px', fontWeight: '600', color: '#111827', fontSize: '14px' }}>{r.name}</td>
+                    <td style={{ padding: '13px 18px', color: '#374151', fontSize: '13px' }}>{r.count}</td>
+                    <td style={{ padding: '13px 18px', fontWeight: '700', color: '#059669', fontSize: '14px' }}>{r.currency} {r.total.toFixed(2)}</td>
+                    <td style={{ padding: '13px 18px' }}>
+                      {r.pending > 0
+                        ? <span style={{ background: '#FFF7ED', color: '#C2410C', padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>{r.pending} pending</span>
+                        : <span style={{ background: '#ECFDF5', color: '#059669', padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>All paid ✓</span>
+                      }
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {(todayReminders?.length ?? 0) > 0 && (
         <div style={{ background: '#EFF6FF', border: '1px solid #93C5FD', borderRadius: '14px', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

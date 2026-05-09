@@ -23,13 +23,16 @@ export default async function AdminReportsPage() {
     { data: allStudents },
     { data: teachers },
     egpRate,
+    { data: commissions },
   ] = await Promise.all([
     supabase.from('payments').select('amount, currency, status, created_at, payment_date'),
     supabase.from('sessions').select('id, session_type, attendance_status, session_date, trial_status, duration'),
     supabase.from('students').select('id, student_status, created_at, currency'),
     supabase.from('teachers').select('id, rate_per_session_usd, profile:profiles!teachers_user_id_fkey(name), sessions(id, attendance_status, session_type, session_date, duration, student:students(student_status))').eq('is_active', true),
     getEGPRate(),
+    supabase.from('commissions').select('amount, currency, status, created_at, sales_user:profiles!commissions_sales_user_id_fkey(name), student:students(name)').order('created_at', { ascending: false }),
   ])
+
 
   const totalStudents = allStudents?.length ?? 0
   const activeStudents = allStudents?.filter(s => s.student_status === 'active').length ?? 0
@@ -167,6 +170,53 @@ export default async function AdminReportsPage() {
             </table>
           </div>
         </div>
+      </div>
+
+      {/* Sales Commissions */}
+      <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '16px', overflow: 'hidden' }}>
+        <div style={{ padding: '16px 20px', borderBottom: '1px solid #E5E7EB', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <h2 style={{ fontSize: '16px', fontWeight: '700', color: '#111827', margin: 0 }}>💰 Sales Commissions</h2>
+          <span style={{ fontSize: '12px', color: '#6B7280' }}>{(commissions ?? []).length} total records</span>
+        </div>
+        {(() => {
+          const byAgent = (commissions ?? []).reduce((acc: Record<string, any>, c: any) => {
+            const name = c.sales_user?.name ?? 'Unknown'
+            if (!acc[name]) acc[name] = { name, count: 0, total: 0, currency: c.currency ?? 'USD', pending: 0, paid: 0 }
+            acc[name].count++
+            acc[name].total += Number(c.amount)
+            if (c.status === 'pending') acc[name].pending++
+            else acc[name].paid++
+            return acc
+          }, {})
+          const rows = Object.values(byAgent).sort((a: any, b: any) => b.total - a.total)
+          if (!rows.length) return <p style={{ padding: '24px', color: '#9CA3AF', textAlign: 'center', margin: 0 }}>No commissions this period</p>
+          return (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: '#F9FAFB' }}>
+                  {['Agent', 'Conversions', 'Commission Earned', 'Paid Out', 'Pending'].map(h => (
+                    <th key={h} style={{ padding: '10px 16px', textAlign: 'left', fontSize: '11px', fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #E5E7EB' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r: any) => (
+                  <tr key={r.name} style={{ borderBottom: '1px solid #F3F4F6' }}>
+                    <td style={{ padding: '13px 16px', fontWeight: '600', color: '#111827', fontSize: '14px' }}>{r.name}</td>
+                    <td style={{ padding: '13px 16px', color: '#374151', fontSize: '13px' }}>{r.count}</td>
+                    <td style={{ padding: '13px 16px', fontWeight: '700', color: '#059669', fontSize: '14px' }}>{r.currency} {r.total.toFixed(2)}</td>
+                    <td style={{ padding: '13px 16px', color: '#059669', fontSize: '13px' }}>{r.paid}</td>
+                    <td style={{ padding: '13px 16px' }}>
+                      {r.pending > 0
+                        ? <span style={{ background: '#FFF7ED', color: '#C2410C', padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>{r.pending}</span>
+                        : <span style={{ color: '#9CA3AF', fontSize: '12px' }}>—</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )
+        })()}
       </div>
     </div>
   )

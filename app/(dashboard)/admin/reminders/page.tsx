@@ -67,6 +67,7 @@ export default async function AdminRemindersPage() {
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '16px' }}>
         {[
+          { label: 'Pending Payment', value: (pendingPayments ?? []).length, color: '#7C3AED', bg: '#F5F3FF' },
           { label: 'Out of Classes', value: outOfClasses.length, color: '#DC2626', bg: '#FEF2F2' },
           { label: '1 Class Left', value: oneLast.length, color: '#EA580C', bg: '#FFF7ED' },
           { label: '2 Classes Left', value: twoLeft.length, color: '#D97706', bg: '#FFFBEB' },
@@ -98,7 +99,48 @@ export default async function AdminRemindersPage() {
         </div>
       )}
 
-      {/* Out of classes */}
+      {/* Pending Payments */}
+      {(pendingPayments ?? []).length > 0 && (
+        <div style={{ background: '#fff', border: '2px solid #DDD6FE', borderRadius: '16px', overflow: 'hidden' }}>
+          <div style={{ background: '#7C3AED', padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <span style={{ color: '#fff', fontWeight: '700', fontSize: '15px' }}>💳 Pending Payments ({(pendingPayments ?? []).length})</span>
+            <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>Students who haven't paid yet</span>
+          </div>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: '#F9FAFB' }}>
+                  {['Student', 'Status', 'Teacher', 'Sales Agent', 'Phone', 'Country', 'Currency'].map(h => (
+                    <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: '11px', fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {(pendingPayments ?? []).map((s: any) => (
+                  <tr key={s.id} style={{ borderBottom: '1px solid #F3F4F6' }}>
+                    <td style={{ padding: '13px 14px' }}>
+                      <p style={{ fontWeight: '600', color: '#111827', margin: 0, fontSize: '14px' }}>{s.name}</p>
+                      {s.email && <p style={{ color: '#9CA3AF', fontSize: '11px', margin: '2px 0 0' }}>{s.email}</p>}
+                    </td>
+                    <td style={{ padding: '13px 14px' }}>
+                      <span style={{ background: s.student_status === 'trial' ? '#FFF7ED' : '#F5F3FF', color: s.student_status === 'trial' ? '#C2410C' : '#7C3AED', padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '600', textTransform: 'capitalize' }}>
+                        {s.student_status}
+                      </span>
+                    </td>
+                    <td style={{ padding: '13px 14px', fontSize: '13px', color: '#374151' }}>{(s.assigned_teacher as any)?.profile?.name ?? '—'}</td>
+                    <td style={{ padding: '13px 14px', fontSize: '13px', color: '#374151' }}>{(s.added_by_sales as any)?.name ?? '—'}</td>
+                    <td style={{ padding: '13px 14px', fontSize: '13px', color: '#374151' }}>{s.phone ?? '—'}</td>
+                    <td style={{ padding: '13px 14px', fontSize: '13px', color: '#374151' }}>{s.country ?? '—'}</td>
+                    <td style={{ padding: '13px 14px', fontSize: '13px', color: '#374151' }}>{s.currency}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+            {/* Out of classes */}
       {outOfClasses.length > 0 && (
         <div style={{ background: '#fff', border: '1px solid #FECACA', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
           <div style={{ padding: '14px 22px', borderBottom: '1px solid #FEE2E2', background: '#FEF2F2', fontWeight: '600', fontSize: '15px', color: '#DC2626' }}>
