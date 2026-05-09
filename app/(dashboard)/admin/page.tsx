@@ -39,6 +39,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
     { data: teacherSessions },
     { data: lowStudents },
     { data: todayReminders },
+    { data: commissions },
   ] = await Promise.all([
     supabase.from('students').select('id, student_status'),
     supabase.from('payments').select('amount, currency').eq('status', 'paid').gte('payment_date', start).lte('payment_date', end),
