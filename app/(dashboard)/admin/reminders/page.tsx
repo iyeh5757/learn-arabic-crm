@@ -12,6 +12,13 @@ export default async function AdminRemindersPage() {
     .neq('student_status', 'inactive')
     .order('consumed_classes', { ascending: false })
 
+  const { data: pendingPayments } = await supabase
+    .from('students')
+    .select('id, name, phone, email, country, currency, student_status, notes, assigned_teacher:teachers(profile:profiles!teachers_user_id_fkey(name)), added_by_sales:profiles!students_added_by_sales_id_fkey(name)')
+    .eq('payment_status', 'pending')
+    .neq('student_status', 'inactive')
+    .order('created_at', { ascending: false })
+
   const { data: todayReminders } = await supabase
     .from('students')
     .select('id, name, phone, email, reminder_date, notes, currency, assigned_teacher:teachers(profile:profiles!teachers_user_id_fkey(name))')
