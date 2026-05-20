@@ -35,23 +35,55 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     const { data: lead } = await adminClient.from('leads').select('*').eq('id', params.id).single()
     if (!lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
 
-    // Create student
-    const { data: student, error: sErr } = await adminClient.from('students').insert({
-      name:               lead.name,
-      email:              lead.email,
-      phone:              lead.phone,
-      country:            lead.country,
-      currency:           currency || 'USD',
-      session_duration:   session_duration || 60,
-      assigned_teacher_id: teacher_id || null,
-      added_by_sales_id:  user.id,
-      student_status:     'trial',
-      payment_status:     'pending',
-      notes:              notes || null,
-      total_paid_classes: 0,
-      consumed_classes:   0,
-    }).select().single()
-    if (sErr) return NextResponse.json({ error: sErr.message }, { status: 500 })
+    // Check if student already exists (by email or name) to avoid duplicates
+    let student: any = null
+    if (lead.email) {
+      const { data: existing } = await adminClient.from('students')
+        .select('*').eq('email', lead.email).maybeSingle()
+      if (existing) student = existing
+    }
+    if (!student && lead.name) {
+      const { data: existing } = await adminClient.from('students')
+        .select('*').eq('name', lead.name).maybeSingle()
+      if (existing) student = existing
+    }
+
+    if (student) {
+      // Update existing student record instead of creating a new one
+      const { data: updated, error: uErr } = await adminClient.from('students')
+        .update({
+          assigned_teacher_id: teacher_id || student.assigned_teacher_id,
+          currency:            currency || student.currency,
+          session_duration:    session_duration || student.session_duration,
+          added_by_sales_id:   user.id,
+          student_status:      'trial',
+          payment_status:      'pending',
+          notes:               notes || student.notes,
+        })
+        .eq('id', student.id)
+        .select().single()
+      if (uErr) return NextResponse.json({ error: uErr.message }, { status: 500 })
+      student = updated
+    } else {
+      // Create new student
+      const { data: created, error: sErr } = await adminClient.from('students').insert({
+        name:               lead.name,
+        email:              lead.email,
+        phone:              lead.phone,
+        country:            lead.country,
+        currency:           currency || 'USD',
+        session_duration:   session_duration || 60,
+        assigned_teacher_id: teacher_id || null,
+        added_by_sales_id:  user.id,
+        student_status:     'trial',
+        payment_status:     'pending',
+        notes:              notes || null,
+        total_paid_classes: 0,
+        consumed_classes:   0,
+      }).select().single()
+      if (sErr) return NextResponse.json({ error: sErr.message }, { status: 500 })
+      student = created
+    }
 
     // Create trial session
     if (teacher_id && trial_date) {
