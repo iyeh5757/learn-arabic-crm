@@ -38,8 +38,8 @@ export default async function AdminReportsPage() {
   const activeStudents = allStudents?.filter(s => s.student_status === 'active').length ?? 0
   const trialStudents = allStudents?.filter(s => s.student_status === 'trial').length ?? 0
   const totalSessions = allSessions?.length ?? 0
-  const attendedSessions = allSessions?.filter(s => s.attendance_status === 'attended').length ?? 0
-  const noShows = allSessions?.filter(s => s.attendance_status === 'no-show').length ?? 0
+  const attendedSessions = allSessions?.filter(s => s.attendance_status === 'attended' || s.attendance_status === 'no_show').length ?? 0
+  const noShows = allSessions?.filter(s => s.attendance_status === 'no_show').length ?? 0
   const trialsConverted = allSessions?.filter(s => s.trial_status === 'converted').length ?? 0
   const trialsLost = allSessions?.filter(s => s.trial_status === 'lost').length ?? 0
   const conversionRate = trialsConverted + trialsLost > 0 ? Math.round((trialsConverted / (trialsConverted + trialsLost)) * 100) : 0
