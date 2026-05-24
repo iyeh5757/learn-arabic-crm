@@ -34,8 +34,8 @@ export default async function TeacherDashboard() {
   ])
 
   const monthSessions = (allSessions ?? []).filter(s => s.session_date >= monthStart)
-  const attendedPaid = monthSessions.filter((s: any) => s.session_type === 'paid' && s.attendance_status === 'attended')
-  const attendedTrials = monthSessions.filter((s: any) => s.session_type === 'trial' && s.attendance_status === 'attended' && s.student?.student_status === 'active')
+  const attendedPaid = monthSessions.filter((s: any) => s.session_type === 'paid' && (s.attendance_status === 'attended' || s.attendance_status === 'no_show'))
+  const attendedTrials = monthSessions.filter((s: any) => s.session_type === 'trial' && (s.attendance_status === 'attended' || s.attendance_status === 'no_show') && s.student?.student_status === 'active')
   const totalHours = attendedPaid.reduce((acc: number, s: any) => acc + ((s.duration ?? 60) / 60), 0)
   const earningsUSD = attendedPaid.reduce((acc: number, s: any) => acc + Number(teacher.rate_per_session_usd) * ((s.duration ?? 60) / 60), 0)
     + attendedTrials.reduce((acc: number, s: any) => acc + ((s.duration ?? 60) >= 60 ? 5 : 3), 0)

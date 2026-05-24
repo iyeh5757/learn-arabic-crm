@@ -35,10 +35,12 @@ export default async function AdminTeachersPage() {
           const activeStudents = (t.students ?? []).filter((s: any) => s.student_status === 'active').length
           const trialStudents = (t.students ?? []).filter((s: any) => s.student_status === 'trial').length
           const monthAttended = (t.sessions ?? []).filter((s: any) =>
-            s.attendance_status === 'attended' && s.session_date >= monthStart &&
+            (s.attendance_status === 'attended' || s.attendance_status === 'no_show') && s.session_date >= monthStart &&
             (s.session_type === 'paid' || s.session_type === 'trial')
           )
-          const monthSessions = monthAttended.filter((s: any) => s.session_type === 'paid').length
+          const paidAttended = monthAttended.filter((s: any) => s.session_type === 'paid' && s.attendance_status === 'attended').length
+          const paidNoShow = monthAttended.filter((s: any) => s.session_type === 'paid' && s.attendance_status === 'no_show').length
+          const monthSessions = paidAttended + paidNoShow
           const monthTrials = monthAttended.filter((s: any) => s.session_type === 'trial' && s.student?.student_status === 'active').length
           const earningsUSD = monthAttended.reduce((acc: number, s: any) => {
             if (s.session_type === 'trial') {
@@ -69,7 +71,10 @@ export default async function AdminTeachersPage() {
                 {[
                   { label: 'Active', value: activeStudents, color: '#059669' },
                   { label: 'Trial', value: trialStudents, color: '#2563EB' },
-                  { label: 'Sessions/Mo', value: monthSessions, color: '#7C3AED' },
+                  { label: 'Attended', value: paidAttended, color: '#059669' },
+                  { label: 'No Show', value: paidNoShow, color: '#DC2626' },
+                  { label: 'Trials (Conv)', value: monthTrials, color: '#0891B2' },
+                  { label: 'Total Paid', value: monthSessions, color: '#7C3AED' },
                 ].map(stat => (
                   <div key={stat.label} style={{ padding: '14px', textAlign: 'center', borderRight: '1px solid #F3F4F6' }}>
                     <p style={{ fontSize: '20px', fontWeight: '700', color: stat.color, margin: 0 }}>{stat.value}</p>
@@ -87,6 +92,11 @@ export default async function AdminTeachersPage() {
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '12px' }}>
                   <span style={{ fontSize: '13px', color: '#6B7280' }}>Earnings this month</span>
                   <span style={{ fontSize: '14px', fontWeight: '700', color: '#0D1B2A' }}>${earningsUSD.toFixed(2)}</span>
+                  <div style={{ fontSize: '11px', color: '#6B7280', marginTop: '4px' }}>
+                    {paidAttended > 0 && <span style={{ marginRight: '6px' }}>✅ {paidAttended} attended</span>}
+                    {paidNoShow > 0 && <span style={{ marginRight: '6px', color: '#DC2626' }}>🚫 {paidNoShow} no-show</span>}
+                    {monthTrials > 0 && <span style={{ color: '#0891B2' }}>🎯 {monthTrials} trial</span>}
+                  </div>
                 </div>
                 {(t.specialties ?? []).length > 0 && (
                   <div style={{ marginBottom: '10px' }}>

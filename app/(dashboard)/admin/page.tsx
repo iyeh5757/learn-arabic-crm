@@ -45,7 +45,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
     supabase.from('payments').select('amount, currency').eq('status', 'paid').gte('payment_date', start).lte('payment_date', end),
     supabase.from('sessions')
       .select('teacher_id, duration, session_type, student_id, student:students(student_status), teacher:teachers(id, rate_per_session_usd, profile:profiles!teachers_user_id_fkey(name))')
-      .in('session_type', ['paid', 'trial']).eq('attendance_status', 'attended')
+      .in('session_type', ['paid', 'trial']).in('attendance_status', ['attended', 'no_show'])
       .gte('session_date', start).lte('session_date', end),
     supabase.from('students').select('id, name, total_paid_classes, consumed_classes').neq('student_status', 'inactive'),
     supabase.from('students').select('id, name').eq('reminder_date', new Date().toISOString().split('T')[0]),
