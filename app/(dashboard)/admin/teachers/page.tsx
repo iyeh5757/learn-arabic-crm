@@ -35,11 +35,11 @@ export default async function AdminTeachersPage() {
           const activeStudents = (t.students ?? []).filter((s: any) => s.student_status === 'active').length
           const trialStudents = (t.students ?? []).filter((s: any) => s.student_status === 'trial').length
           const monthAttended = (t.sessions ?? []).filter((s: any) =>
-            (s.attendance_status === 'attended' || s.attendance_status === 'no_show') && s.session_date >= monthStart &&
+            (s.attendance_status === 'attended' || s.attendance_status === 'no-show') && s.session_date >= monthStart &&
             (s.session_type === 'paid' || s.session_type === 'trial')
           )
           const paidAttended = monthAttended.filter((s: any) => s.session_type === 'paid' && s.attendance_status === 'attended').length
-          const paidNoShow = monthAttended.filter((s: any) => s.session_type === 'paid' && s.attendance_status === 'no_show').length
+          const paidNoShow = monthAttended.filter((s: any) => s.session_type === 'paid' && s.attendance_status === 'no-show').length
           const monthSessions = paidAttended + paidNoShow
           const monthTrials = monthAttended.filter((s: any) => s.session_type === 'trial' && s.student?.student_status === 'active').length
           const earningsUSD = monthAttended.reduce((acc: number, s: any) => {
