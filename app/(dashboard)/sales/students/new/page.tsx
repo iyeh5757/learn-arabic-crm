@@ -39,7 +39,18 @@ export default function SalesNewStudentPage() {
     if (!form.name) { setError('Full name is required'); return }
     setLoading(true); setError('')
     try {
-      const { data: newStudent, error: err } = await supabase.from('students').insert({
+      // Check for duplicate email
+      if (form.email) {
+        const { data: existing } = await supabase
+          .from('students').select('id, name').eq('email', form.email).maybeSingle()
+        if (existing) {
+          setError(`A student with this email already exists: ${existing.name}`)
+          setLoading(false)
+          return
+        }
+      }
+
+  const { data: newStudent, error: err } = await supabase.from('students').insert({
         name: form.name, email: form.email || null, phone: form.phone || null,
         country: form.country || null, currency: form.currency,
         session_duration: Number(form.session_duration),

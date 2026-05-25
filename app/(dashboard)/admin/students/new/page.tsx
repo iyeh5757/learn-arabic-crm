@@ -72,6 +72,17 @@ export default function NewStudentPage() {
         consumed_classes: 0,
       }
 
+      // Check for duplicate email before inserting
+      if (form.email) {
+        const { data: existing } = await supabase
+          .from('students').select('id, name').eq('email', form.email).maybeSingle()
+        if (existing) {
+          setError(`A student with this email already exists: ${existing.name}. Please check the student list.`)
+          setLoading(false)
+          return
+        }
+      }
+
       const { data: newStudent, error: studentErr } = await supabase
         .from('students').insert(studentPayload).select('id').single()
       if (studentErr) throw new Error(studentErr.message)
