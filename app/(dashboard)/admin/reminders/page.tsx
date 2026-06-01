@@ -47,7 +47,7 @@ export default async function AdminRemindersPage() {
         <td style={{ padding: '14px 16px' }}>
           <div style={{ display: 'flex', gap: '8px' }}>
             <Link href={`/admin/students/${s.id}/edit`} style={{ background: '#0D1B2A', color: '#E8C97A', padding: '5px 12px', borderRadius: '6px', textDecoration: 'none', fontSize: '12px', fontWeight: '600' }}>Edit</Link>
-            <Link href={`/admin/payments/new`} style={{ background: '#059669', color: '#fff', padding: '5px 12px', borderRadius: '6px', textDecoration: 'none', fontSize: '12px', fontWeight: '600' }}>+ Pay</Link>
+            <Link href={`/admin/payments/new?student_id=${s.id}&student_name=${encodeURIComponent(s.name)}`} style={{ background: '#059669', color: '#fff', padding: '5px 12px', borderRadius: '6px', textDecoration: 'none', fontSize: '12px', fontWeight: '600' }}>+ Pay</Link>
           </div>
         </td>
       </tr>
