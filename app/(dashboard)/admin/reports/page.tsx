@@ -63,13 +63,19 @@ export default async function AdminReportsPage({
   })
 
   const totalTeacherCost = (teachers ?? []).reduce((acc: number, t: any) => {
-    return acc + (t.sessions ?? []).filter((s: any) => (s.attendance_status === 'attended' || s.attendance_status === 'no-show') && (s.session_type === 'paid' || s.session_type === 'trial')).reduce((sum: number, s: any) => {
-      if (s.session_type === 'trial') {
-        if (s.student?.student_status !== 'active') return sum
-        return sum + ((s.duration ?? 60) >= 60 ? 5 : 3)
-      }
-      return sum + Number(t.rate_per_session_usd) * ((s.duration ?? 60) / 60)
-    }, 0)
+    return acc + (t.sessions ?? [])
+      .filter((s: any) =>
+        s.session_date >= reportStart && s.session_date <= reportEnd &&
+        (s.attendance_status === 'attended' || s.attendance_status === 'no-show') &&
+        (s.session_type === 'paid' || s.session_type === 'trial')
+      )
+      .reduce((sum: number, s: any) => {
+        if (s.session_type === 'trial') {
+          if (s.student?.student_status !== 'active' || s.student?.payment_status !== 'paid') return sum
+          return sum + ((s.duration ?? 60) >= 60 ? 5 : 3)
+        }
+        return sum + Number(t.rate_per_session_usd) * ((s.duration ?? 60) / 60)
+      }, 0)
   }, 0)
 
 
@@ -181,7 +187,7 @@ export default async function AdminReportsPage({
                   const allS = (t.sessions ?? []).filter((s: any) => s.session_date >= reportStart && s.session_date <= reportEnd)
                   const paidSessionsArr = allS.filter((s: any) => s.session_type === 'paid' && (s.attendance_status === 'attended' || s.attendance_status === 'no-show'))
                   const paid = paidSessionsArr.length
-                  const trialSessionsArr = allS.filter((s: any) => s.session_type === 'trial' && (s.attendance_status === 'attended' || s.attendance_status === 'no-show') && s.student?.student_status === 'active')
+                  const trialSessionsArr = allS.filter((s: any) => s.session_type === 'trial' && (s.attendance_status === 'attended' || s.attendance_status === 'no-show') && s.student?.student_status === 'active' && s.student?.payment_status === 'paid')
                   const trials = trialSessionsArr.length
                   const earned = paidSessionsArr.reduce((sum: number, s: any) => sum + Number(t.rate_per_session_usd) * ((s.duration ?? 60) / 60), 0)
                     + trialSessionsArr.reduce((sum: number, s: any) => sum + ((s.duration ?? 60) >= 60 ? 5 : 3), 0)

@@ -11,7 +11,7 @@ export default async function AdminTeachersPage() {
       id, rate_per_session_usd, languages, specialties, is_active,
       profile:profiles!teachers_user_id_fkey(id, name, email, is_active),
       students:students(id, student_status),
-      sessions:sessions(id, session_type, attendance_status, session_date, duration, student:students(student_status))
+      sessions:sessions(id, session_type, attendance_status, session_date, duration, student:students(student_status, payment_status))
     `)
     .order('is_active', { ascending: false })
 
@@ -25,9 +25,14 @@ export default async function AdminTeachersPage() {
           <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#111827', margin: 0 }}>Teachers</h1>
           <p style={{ color: '#6B7280', fontSize: '14px', margin: '4px 0 0 0' }}>{teachers?.length ?? 0} teachers</p>
         </div>
-        <Link href="/admin/users/new" style={{ background: '#0D1B2A', color: '#E8C97A', padding: '10px 20px', borderRadius: '10px', textDecoration: 'none', fontWeight: '600', fontSize: '14px' }}>
-          + Add Teacher
-        </Link>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <Link href="/admin/teachers/breakdown" style={{ background: '#F3F4F6', color: '#374151', padding: '10px 20px', borderRadius: '10px', textDecoration: 'none', fontWeight: '600', fontSize: '14px' }}>
+            📊 Breakdown
+          </Link>
+          <Link href="/admin/users/new" style={{ background: '#0D1B2A', color: '#E8C97A', padding: '10px 20px', borderRadius: '10px', textDecoration: 'none', fontWeight: '600', fontSize: '14px' }}>
+            + Add Teacher
+          </Link>
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
@@ -38,13 +43,13 @@ export default async function AdminTeachersPage() {
             (s.attendance_status === 'attended' || s.attendance_status === 'no-show') && s.session_date >= monthStart &&
             (s.session_type === 'paid' || s.session_type === 'trial')
           )
-          const paidAttended = monthAttended.filter((s: any) => s.session_type === 'paid' && s.attendance_status === 'attended').length
+          const paidAttended = monthAttended.filter((s: any) => s.session_type === 'paid' && (s.attendance_status === 'attended' || s.attendance_status === 'no-show')).length
           const paidNoShow = monthAttended.filter((s: any) => s.session_type === 'paid' && s.attendance_status === 'no-show').length
           const monthSessions = paidAttended + paidNoShow
-          const monthTrials = monthAttended.filter((s: any) => s.session_type === 'trial' && s.student?.student_status === 'active').length
+          const monthTrials = monthAttended.filter((s: any) => s.session_type === 'trial' && s.student?.student_status === 'active' && s.student?.payment_status === 'paid').length
           const earningsUSD = monthAttended.reduce((acc: number, s: any) => {
             if (s.session_type === 'trial') {
-              if (s.student?.student_status !== 'active') return acc
+              if (s.student?.student_status !== 'active' || s.student?.payment_status !== 'paid') return acc
               return acc + ((s.duration ?? 60) >= 60 ? 5 : 3)
             }
             return acc + Number(t.rate_per_session_usd) * ((s.duration ?? 60) / 60)

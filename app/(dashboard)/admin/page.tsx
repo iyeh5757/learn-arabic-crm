@@ -44,7 +44,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
     supabase.from('students').select('id, student_status'),
     supabase.from('payments').select('amount, currency, payment_date, created_at').eq('status', 'paid').gte('created_at', `${start}T00:00:00`).lte('created_at', `${end}T23:59:59`),
     supabase.from('sessions')
-      .select('teacher_id, duration, session_type, student_id, student:students(student_status), teacher:teachers(id, rate_per_session_usd, profile:profiles!teachers_user_id_fkey(name))')
+      .select('teacher_id, duration, session_type, student_id, student:students(student_status, payment_status), teacher:teachers(id, rate_per_session_usd, profile:profiles!teachers_user_id_fkey(name))')
       .in('session_type', ['paid', 'trial']).in('attendance_status', ['attended', 'no-show'])
       .gte('session_date', start).lte('session_date', end),
     supabase.from('students').select('id, name, total_paid_classes, consumed_classes').neq('student_status', 'inactive'),
@@ -83,7 +83,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
     existing.sessions++
     if (s.session_type === 'trial') {
       // Only count trial fee if student converted to active (paid)
-      if (s.student?.student_status === 'active') {
+      if (s.student?.student_status === 'active' && s.student?.payment_status === 'paid') {
         existing.usd += (s.duration ?? 60) >= 60 ? 5 : 3
         existing.trials = (existing.trials ?? 0) + 1
       }
