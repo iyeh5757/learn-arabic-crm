@@ -27,6 +27,7 @@ export default function StudentsTable({ students, role }: { students: any[]; rol
               <th className="table-header">Name</th>
               <th className="table-header">Status</th>
               <th className="table-header">Teacher</th>
+              <th className="table-header">Phone</th>
               <th className="table-header">Country</th>
               <th className="table-header">Currency</th>
               <th className="table-header text-center">Classes</th>
@@ -62,6 +63,7 @@ export default function StudentsTable({ students, role }: { students: any[]; rol
                   <td className="table-cell text-gray-600">
                     {s.assigned_teacher?.profile?.name ?? <span className="text-gray-300">Unassigned</span>}
                   </td>
+                  <td className="table-cell text-gray-500">{s.phone ?? '—'}</td>
                   <td className="table-cell text-gray-600">{s.country ?? '—'}</td>
                   <td className="table-cell">
                     <span className="badge bg-gray-100 text-gray-700">{s.currency}</span>
