@@ -1,4 +1,5 @@
 // app/(dashboard)/admin/reports/page.tsx
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 
 async function getEGPRate(): Promise<number> {
@@ -9,9 +10,21 @@ async function getEGPRate(): Promise<number> {
   } catch { return 48.5 }
 }
 
-export default async function AdminReportsPage() {
+export default async function AdminReportsPage({
+  searchParams
+}: { searchParams?: { month?: string } }) {
   const supabase = createClient()
   const now = new Date()
+
+  // Month range
+  const base = searchParams?.month ? new Date(`${searchParams.month}-01`) : new Date(now.getFullYear(), now.getMonth(), 1)
+  const reportStart = new Date(base.getFullYear(), base.getMonth(), 1).toISOString().split('T')[0]
+  const reportEnd = new Date(base.getFullYear(), base.getMonth() + 1, 0).toISOString().split('T')[0]
+  const reportLabel = base.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })
+  const reportParam = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}`
+  const prevParam = (() => { const d = new Date(base.getFullYear(), base.getMonth() - 1, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` })()
+  const nextParam = (() => { const d = new Date(base.getFullYear(), base.getMonth() + 1, 1); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` })()
+
   const months = Array.from({ length: 6 }, (_, i) => {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
     return { label: d.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }), start: d.toISOString().split('T')[0], end: new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split('T')[0] }
@@ -72,9 +85,16 @@ export default async function AdminReportsPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-      <div>
-        <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#111827', margin: 0 }}>Reports & Analytics</h1>
-        <p style={{ color: '#6B7280', fontSize: '14px', margin: '4px 0 0 0' }}>All-time overview</p>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
+        <div>
+          <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#111827', margin: 0 }}>Reports & Analytics</h1>
+          <p style={{ color: '#6B7280', fontSize: '14px', margin: '4px 0 0 0' }}>{reportLabel}</p>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#fff', border: '1px solid #E5E7EB', borderRadius: '12px', padding: '6px 10px' }}>
+          <Link href={`?month=${prevParam}`} style={{ padding: '6px 12px', background: '#F3F4F6', borderRadius: '8px', textDecoration: 'none', color: '#374151', fontWeight: '600', fontSize: '13px' }}>‹</Link>
+          <span style={{ fontWeight: '700', color: '#111827', fontSize: '14px', minWidth: '130px', textAlign: 'center' }}>{reportLabel}</span>
+          <Link href={`?month=${nextParam}`} style={{ padding: '6px 12px', background: '#F3F4F6', borderRadius: '8px', textDecoration: 'none', color: '#374151', fontWeight: '600', fontSize: '13px' }}>›</Link>
+        </div>
       </div>
 
       {/* Student Stats */}

@@ -42,7 +42,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
     { data: commissions },
   ] = await Promise.all([
     supabase.from('students').select('id, student_status'),
-    supabase.from('payments').select('amount, currency').eq('status', 'paid').gte('payment_date', start).lte('payment_date', end),
+    supabase.from('payments').select('amount, currency, payment_date, created_at').eq('status', 'paid').gte('created_at', `${start}T00:00:00`).lte('created_at', `${end}T23:59:59`),
     supabase.from('sessions')
       .select('teacher_id, duration, session_type, student_id, student:students(student_status), teacher:teachers(id, rate_per_session_usd, profile:profiles!teachers_user_id_fkey(name))')
       .in('session_type', ['paid', 'trial']).in('attendance_status', ['attended', 'no-show'])

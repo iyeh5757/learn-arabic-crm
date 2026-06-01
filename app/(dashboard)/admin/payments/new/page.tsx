@@ -2,13 +2,17 @@
 // app/(dashboard)/admin/payments/new/page.tsx
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Suspense } from 'react'
 
 const PLANS_60 = [4, 8, 12, 16, 20]
 const PLANS_30 = [4, 8, 12, 16, 20]
 
-export default function NewPaymentPage() {
+function NewPaymentPageInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const preStudentId = searchParams.get('student_id') ?? ''
+  const preStudentName = searchParams.get('student_name') ?? ''
   const supabase = createClient()
   const [students, setStudents] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
@@ -16,7 +20,7 @@ export default function NewPaymentPage() {
   const [currentUserId, setCurrentUserId] = useState('')
 
   const [form, setForm] = useState({
-    student_id: '', number_of_classes: 16, amount: '',
+    student_id: preStudentId, number_of_classes: 16, amount: '',
     currency: 'USD', payment_method: '', status: 'pending',
     payment_date: new Date().toISOString().split('T')[0],
     is_renewal: false, notes: '',
@@ -163,4 +167,7 @@ export default function NewPaymentPage() {
       </form>
     </div>
   )
+}
+export default function NewPaymentPage() {
+  return <Suspense fallback={<div style={{padding:'60px',textAlign:'center',color:'#6B7280'}}>Loading…</div>}><NewPaymentPageInner /></Suspense>
 }

@@ -82,12 +82,22 @@ export default function StudentsTable({ students, role }: { students: any[]; rol
                   <td className="table-cell text-gray-500 text-xs">{s.added_by_sales?.name ?? '—'}</td>
                   <td className="table-cell">
                     <div className="flex items-center gap-2">
-                      <Link href={`${basePath}/${s.id}`} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors">
+                      <Link href={`${basePath}/${s.id}/edit`} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors" title="View/Edit">
                         <Eye size={15} />
                       </Link>
                       <Link href={`${basePath}/${s.id}/edit`} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 hover:text-gray-900 transition-colors">
                         <Edit size={15} />
                       </Link>
+                      {role === 'admin' && (
+                        <Link href={`/admin/payments/new?student_id=${s.id}&student_name=${encodeURIComponent(s.name)}`} className="p-1.5 rounded-lg hover:bg-green-50 text-gray-500 hover:text-green-700 transition-colors" title="Add Payment">
+                          <span style={{fontSize:'12px', fontWeight:'700', color:'inherit'}}>💳</span>
+                        </Link>
+                      )}
+                      {role === 'sales' && (
+                        <Link href={`/sales/payments/new?student_id=${s.id}&student_name=${encodeURIComponent(s.name)}`} className="p-1.5 rounded-lg hover:bg-green-50 text-gray-500 hover:text-green-700 transition-colors" title="Add Payment">
+                          <span style={{fontSize:'12px', fontWeight:'700', color:'inherit'}}>💳</span>
+                        </Link>
+                      )}
                     </div>
                   </td>
                 </tr>

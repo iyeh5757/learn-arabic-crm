@@ -9,6 +9,10 @@ export default function SessionsPage() {
   const [sessions, setSessions] = useState<any[]>([])
   const [teachers, setTeachers] = useState<any[]>([])
   const [selectedTeacher, setSelectedTeacher] = useState('')
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date()
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  })
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -17,14 +21,18 @@ export default function SessionsPage() {
 
   useEffect(() => {
     setLoading(true)
+    const monthStart = `${selectedMonth}-01`
+    const [yr, mo] = selectedMonth.split('-').map(Number)
+    const monthEnd = new Date(yr, mo, 0).toISOString().split('T')[0]
     let query = supabase
       .from('sessions')
       .select('*, student:students(name), teacher:teachers(id, profile:profiles!teachers_user_id_fkey(name))')
+      .gte('session_date', monthStart)
+      .lte('session_date', monthEnd)
       .order('session_date', { ascending: false })
-      .limit(200)
     if (selectedTeacher) query = query.eq('teacher_id', selectedTeacher)
     query.then(({ data }) => { setSessions(data ?? []); setLoading(false) })
-  }, [selectedTeacher])
+  }, [selectedTeacher, selectedMonth])
 
   const attColor: Record<string, { bg: string; text: string }> = {
     attended:  { bg: '#ECFDF5', text: '#059669' },
@@ -43,6 +51,9 @@ export default function SessionsPage() {
           <p style={{ color: '#6B7280', fontSize: '14px', margin: '4px 0 0 0' }}>{sessions.length} total</p>
         </div>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+          {/* Month filter */}
+          <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}
+            style={{ ...inp, minWidth: '150px' }} />
           {/* Teacher filter */}
           <select style={{ ...inp, minWidth: '180px' }} value={selectedTeacher} onChange={e => setSelectedTeacher(e.target.value)}>
             <option value="">All Teachers</option>

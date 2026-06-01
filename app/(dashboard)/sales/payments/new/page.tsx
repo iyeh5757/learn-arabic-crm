@@ -2,17 +2,21 @@
 // app/(dashboard)/sales/payments/new/page.tsx
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Suspense } from 'react'
 
-export default function SalesNewPaymentPage() {
+function SalesNewPaymentInner() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const preStudentId = searchParams.get('student_id') ?? ''
+  const preStudentName = searchParams.get('student_name') ?? ''
   const supabase = createClient()
   const [students, setStudents] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [currentUserId, setCurrentUserId] = useState('')
   const [form, setForm] = useState({
-    student_id: '', number_of_classes: 16, amount: '',
+    student_id: typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('student_id') ?? '' : '', number_of_classes: 16, amount: '',
     currency: 'USD', payment_method: '', status: 'pending',
     payment_date: new Date().toISOString().split('T')[0],
     is_renewal: false, notes: '',
@@ -128,4 +132,8 @@ export default function SalesNewPaymentPage() {
       </form>
     </div>
   )
+}
+
+export default function SalesNewPaymentPage() {
+  return <Suspense fallback={<div style={{padding:'60px',textAlign:'center',color:'#6B7280'}}>Loading…</div>}><SalesNewPaymentInner /></Suspense>
 }
