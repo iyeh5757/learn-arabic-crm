@@ -48,7 +48,9 @@ export default function SessionsPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#111827', margin: 0 }}>Sessions</h1>
-          <p style={{ color: '#6B7280', fontSize: '14px', margin: '4px 0 0 0' }}>{sessions.length} total</p>
+          <p style={{ color: '#6B7280', fontSize: '14px', margin: '4px 0 0 0' }}>
+            {sessions.length} sessions — {new Date(`${selectedMonth}-01`).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' })}
+          </p>
         </div>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
           {/* Month filter */}
