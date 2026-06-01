@@ -38,12 +38,12 @@ export default async function AdminReportsPage({
     egpRate,
     { data: commissions },
   ] = await Promise.all([
-    supabase.from('payments').select('amount, currency, status, created_at, payment_date'),
-    supabase.from('sessions').select('id, session_type, attendance_status, session_date, trial_status, duration'),
+    supabase.from('payments').select('amount, currency, status, created_at, payment_date').gte('created_at', `${reportStart}T00:00:00`).lte('created_at', `${reportEnd}T23:59:59`),
+    supabase.from('sessions').select('id, session_type, attendance_status, session_date, trial_status, duration').gte('session_date', reportStart).lte('session_date', reportEnd),
     supabase.from('students').select('id, name, student_status, created_at, currency, payment_status, total_paid_classes, consumed_classes, added_by_sales:profiles!students_added_by_sales_id_fkey(id, name)'),
-    supabase.from('teachers').select('id, rate_per_session_usd, profile:profiles!teachers_user_id_fkey(name), sessions(id, attendance_status, session_type, session_date, duration, student:students(student_status))').eq('is_active', true),
+    supabase.from('teachers').select('id, rate_per_session_usd, profile:profiles!teachers_user_id_fkey(name), sessions(id, attendance_status, session_type, session_date, duration, student:students(student_status))').eq('is_active', true).gte('sessions.session_date', reportStart).lte('sessions.session_date', reportEnd),
     getEGPRate(),
-    supabase.from('commissions').select('amount, currency, status, created_at, sales_user:profiles!commissions_sales_user_id_fkey(name), student:students(name)').order('created_at', { ascending: false }),
+    supabase.from('commissions').select('amount, currency, status, created_at, sales_user:profiles!commissions_sales_user_id_fkey(name), student:students(name)').gte('created_at', `${reportStart}T00:00:00`).lte('created_at', `${reportEnd}T23:59:59`).order('created_at', { ascending: false }),
   ])
 
 
@@ -178,7 +178,7 @@ export default async function AdminReportsPage({
               </tr></thead>
               <tbody>
                 {(teachers ?? []).map((t: any) => {
-                  const allS = t.sessions ?? []
+                  const allS = (t.sessions ?? []).filter((s: any) => s.session_date >= reportStart && s.session_date <= reportEnd)
                   const paidSessionsArr = allS.filter((s: any) => s.session_type === 'paid' && (s.attendance_status === 'attended' || s.attendance_status === 'no-show'))
                   const paid = paidSessionsArr.length
                   const trialSessionsArr = allS.filter((s: any) => s.session_type === 'trial' && (s.attendance_status === 'attended' || s.attendance_status === 'no-show') && s.student?.student_status === 'active')
