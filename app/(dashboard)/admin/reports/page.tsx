@@ -35,9 +35,9 @@ export default async function AdminReportsPage({
     { data: allSessions },
     { data: allStudents },
     { data: teachers },
+    { data: teacherSessions },
     egpRate,
     { data: commissions },
-    { data: teacherSessions },
   ] = await Promise.all([
     supabase.from('payments').select('amount, currency, status, created_at, payment_date').gte('created_at', `${reportStart}T00:00:00`).lte('created_at', `${reportEnd}T23:59:59`),
     supabase.from('sessions').select('id, session_type, attendance_status, session_date, trial_status, duration').gte('session_date', reportStart).lte('session_date', reportEnd),
