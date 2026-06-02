@@ -10,7 +10,11 @@ function NewPaymentForm() {
   const searchParams = useSearchParams()
   const preselectedStudent = searchParams.get('student')
   const supabase = createClient()
-  const [students, setStudents] = useState<any[]>([])
+const today = (() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })()
+    const [students, setStudents] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [currentUserId, setCurrentUserId] = useState('')
@@ -18,7 +22,7 @@ function NewPaymentForm() {
     student_id: preselectedStudent ?? '',
     number_of_classes: 16, amount: '',
     currency: 'USD', payment_method: '',
-    status: 'pending', payment_date: new Date().toISOString().split('T')[0],
+    status: 'pending', payment_date: today,
     is_renewal: true, notes: '',
   })
 

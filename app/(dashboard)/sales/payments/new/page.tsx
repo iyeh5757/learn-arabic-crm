@@ -11,7 +11,11 @@ function SalesNewPaymentInner() {
   const preStudentId = searchParams.get('student_id') ?? ''
   const preStudentName = searchParams.get('student_name') ?? ''
   const supabase = createClient()
-  const [students, setStudents] = useState<any[]>([])
+const today = (() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })()
+    const [students, setStudents] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [currentUserId, setCurrentUserId] = useState('')
@@ -135,9 +139,5 @@ function SalesNewPaymentInner() {
 }
 
 export default function SalesNewPaymentPage() {
-  const today = (() => {
-    const d = new Date()
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  })()
   return <Suspense fallback={<div style={{padding:'60px',textAlign:'center',color:'#6B7280'}}>Loading…</div>}><SalesNewPaymentInner /></Suspense>
 }

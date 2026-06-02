@@ -5,13 +5,13 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
 export default function NewSessionPage() {
-  const today = (() => {
+  const router = useRouter()
+  const supabase = createClient()
+const today = (() => {
     const d = new Date()
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   })()
-  const router = useRouter()
-  const supabase = createClient()
-  const [students, setStudents] = useState<any[]>([])
+    const [students, setStudents] = useState<any[]>([])
   const [teachers, setTeachers] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')

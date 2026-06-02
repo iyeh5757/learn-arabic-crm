@@ -11,7 +11,11 @@ const PRESET_CLASSES = [4, 8, 12, 16, 20]
 export default function SalesNewStudentPage() {
   const router = useRouter()
   const supabase = createClient()
-  const [teachers, setTeachers] = useState<any[]>([])
+const today = (() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })()
+    const [teachers, setTeachers] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [currentUserId, setCurrentUserId] = useState('')
@@ -71,7 +75,7 @@ export default function SalesNewStudentPage() {
           amount: Number(form.amount), currency: form.currency,
           payment_method: form.payment_method || 'Other',
           status: form.payment_status, added_by: currentUserId,
-          payment_date: new Date().toISOString().split('T')[0], is_renewal: false,
+          payment_date: today, is_renewal: false,
         })
         if (payErr) throw new Error(payErr.message)
       }
