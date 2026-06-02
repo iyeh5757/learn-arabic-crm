@@ -18,7 +18,7 @@ function SalesNewPaymentInner() {
   const [form, setForm] = useState({
     student_id: typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('student_id') ?? '' : '', number_of_classes: 16, amount: '',
     currency: 'USD', payment_method: '', status: 'pending',
-    payment_date: new Date().toISOString().split('T')[0],
+    payment_date: today,
     is_renewal: false, notes: '',
   })
 
@@ -135,5 +135,9 @@ function SalesNewPaymentInner() {
 }
 
 export default function SalesNewPaymentPage() {
+  const today = (() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })()
   return <Suspense fallback={<div style={{padding:'60px',textAlign:'center',color:'#6B7280'}}>Loading…</div>}><SalesNewPaymentInner /></Suspense>
 }

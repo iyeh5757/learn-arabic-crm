@@ -10,6 +10,10 @@ const COUNTRY_CURRENCY: Record<string, string> = { 'United Arab Emirates':'AED',
 const PRESET_CLASSES = [4, 8, 12, 16, 20]
 
 export default function NewStudentPage() {
+  const today = (() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })()
   const router = useRouter()
   const supabase = createClient()
   const [teachers, setTeachers] = useState<any[]>([])
@@ -97,7 +101,7 @@ export default function NewStudentPage() {
           payment_method: form.payment_method || 'Other',
           status: form.payment_status,
           added_by: currentUserId,
-          payment_date: new Date().toISOString().split('T')[0],
+          payment_date: today,
           is_renewal: false,
         })
         if (payErr) throw new Error(payErr.message)

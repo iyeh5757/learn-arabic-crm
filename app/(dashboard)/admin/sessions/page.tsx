@@ -23,10 +23,11 @@ export default function SessionsPage() {
     setLoading(true)
     const monthStart = `${selectedMonth}-01`
     const [yr, mo] = selectedMonth.split('-').map(Number)
-    const monthEnd = new Date(yr, mo, 0).toISOString().split('T')[0]
+    const lastDay = new Date(yr, mo, 0).getDate()
+    const monthEnd = `${selectedMonth.split('-')[0]}-${String(mo).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
     let query = supabase
       .from('sessions')
-      .select('*, student:students(name), teacher:teachers!left(id, profile:profiles!teachers_user_id_fkey(name))')
+      .select('*, student:students!left(name), teacher:teachers!left(id, profile:profiles!teachers_user_id_fkey(name))')
       .gte('session_date', monthStart)
       .lte('session_date', monthEnd)
       .order('session_date', { ascending: false })

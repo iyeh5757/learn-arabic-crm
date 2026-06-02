@@ -5,6 +5,10 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
 export default function TeacherNewSessionPage() {
+  const today = (() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })()
   const router = useRouter()
   const supabase = createClient()
   const [students, setStudents] = useState<any[]>([])
@@ -12,7 +16,7 @@ export default function TeacherNewSessionPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [form, setForm] = useState({
-    student_id: '', session_date: new Date().toISOString().split('T')[0],
+    student_id: '', session_date: today,
     session_time: '', duration: 60, session_type: 'paid',
     attendance_status: 'attended', homework: false,
     feedback: '', student_rating: '', trial_status: '', notes: '',
