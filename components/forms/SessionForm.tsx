@@ -12,21 +12,17 @@ interface Props {
   role: string
 }
 
-export default function SessionForm({
+export default function SessionForm({ students, teacherId, session, redirectTo, role }: Props) {
   const today = (() => {
     const d = new Date()
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   })()
 
-   students, teacherId, session, redirectTo, role }: Props) {
-  
-  
-
   const router = useRouter()
   const supabase = createClient()
   const isEdit = !!session?.id
 
-    const [form, setForm] = useState({
+  const [form, setForm] = useState({
     student_id:        session?.student_id ?? '',
     session_date:      session?.session_date ?? today,
     session_time:      session?.session_time ?? '',
