@@ -14,15 +14,14 @@ function NewPaymentPageInner() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   })()
 
+  
+
   const router = useRouter()
   const searchParams = useSearchParams()
   const preStudentId = searchParams.get('student_id') ?? ''
   const preStudentName = searchParams.get('student_name') ?? ''
   const supabase = createClient()
-const today = (() => {
-    const d = new Date()
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  })()
+
     const [students, setStudents] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')

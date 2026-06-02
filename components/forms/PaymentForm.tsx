@@ -30,25 +30,20 @@ const PLANS = {
 }
 
 export default function PaymentForm({
+  const today = (() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })()
+
   students, currentUserId, payment, redirectTo, preselectedStudentId
 }: Props) {
-  const today = (() => {
-    const d = new Date()
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  })()
-  const today = (() => {
-    const d = new Date()
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  })()
+  
+  
 
   const router = useRouter()
   const supabase = createClient()
   const isEdit = !!payment?.id
 
-const today = (() => {
-    const d = new Date()
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  })()
     const [form, setForm] = useState({
     student_id:         payment?.student_id ?? preselectedStudentId ?? '',
     number_of_classes:  payment?.number_of_classes ?? 16,
