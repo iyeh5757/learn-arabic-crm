@@ -9,6 +9,11 @@ const COUNTRY_CURRENCY: Record<string, string> = { 'United Arab Emirates':'AED',
 const PRESET_CLASSES = [4, 8, 12, 16, 20]
 
 export default function SalesNewStudentPage() {
+  const today = (() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })()
+
   const router = useRouter()
   const supabase = createClient()
 const today = (() => {

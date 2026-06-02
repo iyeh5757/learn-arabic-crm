@@ -12,14 +12,31 @@ interface Props {
   role: string
 }
 
-export default function SessionForm({ students, teacherId, session, redirectTo, role }: Props) {
+export default function SessionForm({
+  const today = (() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })() students, teacherId, session, redirectTo, role }: Props) {
+  const today = (() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })()
+  const today = (() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })()
+
   const router = useRouter()
   const supabase = createClient()
   const isEdit = !!session?.id
 
-  const [form, setForm] = useState({
+const today = (() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })()
+    const [form, setForm] = useState({
     student_id:        session?.student_id ?? '',
-    session_date:      session?.session_date ?? new Date().toISOString().split('T')[0],
+    session_date:      session?.session_date ?? today,
     session_time:      session?.session_time ?? '',
     duration:          session?.duration ?? 60,
     session_type:      session?.session_type ?? 'paid',

@@ -6,6 +6,11 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 
 function SalesNewPaymentInner() {
+  const today = (() => {
+    const d = new Date()
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  })()
+
   const router = useRouter()
   const searchParams = useSearchParams()
   const preStudentId = searchParams.get('student_id') ?? ''
