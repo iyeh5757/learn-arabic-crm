@@ -26,7 +26,7 @@ export default function SessionsPage() {
     const monthEnd = new Date(yr, mo, 0).toISOString().split('T')[0]
     let query = supabase
       .from('sessions')
-      .select('*, student:students(name), teacher:teachers(id, profile:profiles!teachers_user_id_fkey(name))')
+      .select('*, student:students(name), teacher:teachers!left(id, profile:profiles!teachers_user_id_fkey(name))')
       .gte('session_date', monthStart)
       .lte('session_date', monthEnd)
       .order('session_date', { ascending: false })
