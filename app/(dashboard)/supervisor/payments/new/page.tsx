@@ -1,12 +1,11 @@
 'use client'
-// app/(dashboard)/admin/payments/new/page.tsx
+// app/(dashboard)/supervisor/payments/new/page.tsx
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 
 const PLANS_60 = [4, 8, 12, 16, 20]
-const PLANS_30 = [4, 8, 12, 16, 20]
 
 function NewPaymentPageInner() {
   const today = (() => {
@@ -14,15 +13,12 @@ function NewPaymentPageInner() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   })()
 
-  
-
   const router = useRouter()
   const searchParams = useSearchParams()
   const preStudentId = searchParams.get('student_id') ?? ''
-  const preStudentName = searchParams.get('student_name') ?? ''
   const supabase = createClient()
 
-    const [students, setStudents] = useState<any[]>([])
+  const [students, setStudents] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [currentUserId, setCurrentUserId] = useState('')
@@ -35,11 +31,25 @@ function NewPaymentPageInner() {
   })
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id ?? ''))
-    supabase.from('students').select('id, name, currency, session_duration, total_paid_classes, consumed_classes, payment_method').order('name').then(({ data }) => {
+    async function load() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      setCurrentUserId(user.id)
+
+      const { data: myTeachers } = await supabase.from('teachers').select('id').eq('supervisor_id', user.id)
+      const teacherIds = (myTeachers ?? []).map(t => t.id)
+      if (teacherIds.length === 0) { setStudents([]); return }
+
+      const { data } = await supabase
+        .from('students')
+        .select('id, name, currency, session_duration, total_paid_classes, consumed_classes, payment_method')
+        .in('assigned_teacher_id', teacherIds)
+        .order('name')
+
       setStudents(data ?? [])
       if (preStudentId) handleStudentChange(preStudentId, data ?? [])
-    })
+    }
+    load()
   }, [])
 
   const selectedStudent = students.find(s => s.id === form.student_id)
@@ -87,7 +97,7 @@ function NewPaymentPageInner() {
       added_by: currentUserId,
     })
     if (err) { setError(err.message); setLoading(false); return }
-    router.push('/admin/payments')
+    router.push('/supervisor/reminders')
     router.refresh()
   }
 

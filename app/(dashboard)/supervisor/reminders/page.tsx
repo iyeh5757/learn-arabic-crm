@@ -74,6 +74,14 @@ export default async function SupervisorRemindersPage() {
                 {cols.includes('Remaining') && <td style={{ ...cell, fontWeight: '700', color: (s.remaining_classes ?? 0) <= 0 ? '#DC2626' : '#D97706' }}>{s.remaining_classes ?? 0}</td>}
                 {cols.includes('Status') && <td style={cell}>{s.student_status}</td>}
                 {cols.includes('Currency') && <td style={cell}>{s.currency}</td>}
+                {cols.includes('Actions') && (
+                  <td style={cell}>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
+                      <Link href={`/supervisor/students/${s.id}/edit`} style={{ background: '#0D1B2A', color: '#E8C97A', padding: '5px 12px', borderRadius: '6px', textDecoration: 'none', fontSize: '12px', fontWeight: '600' }}>Edit</Link>
+                      <Link href={`/supervisor/payments/new?student_id=${s.id}&student_name=${encodeURIComponent(s.name)}`} style={{ background: '#059669', color: '#fff', padding: '5px 12px', borderRadius: '6px', textDecoration: 'none', fontSize: '12px', fontWeight: '600' }}>+ Pay</Link>
+                    </div>
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
@@ -111,7 +119,7 @@ export default async function SupervisorRemindersPage() {
           <div style={hdrStyle('#7C3AED')}>
             <span style={{ color: '#fff', fontWeight: '700', fontSize: '15px' }}>💳 Pending Payments ({(pendingPayments ?? []).length})</span>
           </div>
-          <StudentTable students={pendingPayments ?? []} cols={['Student', 'Phone', 'Teacher', 'Status', 'Currency']} />
+          <StudentTable students={pendingPayments ?? []} cols={['Student', 'Phone', 'Teacher', 'Status', 'Currency', 'Actions']} />
         </div>
       )}
 
@@ -121,7 +129,7 @@ export default async function SupervisorRemindersPage() {
           <div style={hdrStyle('#FEF2F2')}>
             <span style={{ color: '#DC2626', fontWeight: '700', fontSize: '15px' }}>🚨 Out of Classes ({outOfClasses.length})</span>
           </div>
-          <StudentTable students={outOfClasses} cols={['Student', 'Phone', 'Teacher', 'Remaining']} />
+          <StudentTable students={outOfClasses} cols={['Student', 'Phone', 'Teacher', 'Remaining', 'Actions']} />
         </div>
       )}
 
@@ -131,7 +139,7 @@ export default async function SupervisorRemindersPage() {
           <div style={hdrStyle('#FFF7ED')}>
             <span style={{ color: '#EA580C', fontWeight: '700', fontSize: '15px' }}>⚠️ 1 Class Left ({oneLast.length})</span>
           </div>
-          <StudentTable students={oneLast} cols={['Student', 'Phone', 'Teacher', 'Remaining']} />
+          <StudentTable students={oneLast} cols={['Student', 'Phone', 'Teacher', 'Remaining', 'Actions']} />
         </div>
       )}
 
@@ -141,7 +149,7 @@ export default async function SupervisorRemindersPage() {
           <div style={hdrStyle('#FFFBEB')}>
             <span style={{ color: '#D97706', fontWeight: '700', fontSize: '15px' }}>📢 2 Classes Left ({twoLeft.length})</span>
           </div>
-          <StudentTable students={twoLeft} cols={['Student', 'Phone', 'Teacher', 'Remaining']} />
+          <StudentTable students={twoLeft} cols={['Student', 'Phone', 'Teacher', 'Remaining', 'Actions']} />
         </div>
       )}
 
