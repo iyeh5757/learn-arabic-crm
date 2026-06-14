@@ -37,10 +37,11 @@ const NAV: Record<string, { label: string; href: string; emoji: string }[]> = {
     { label: 'Reminders', href: '/accountant/reminders', emoji: '🔔' },
   ],
   supervisor: [
-    { label: 'Dashboard', href: '/supervisor',          emoji: '📊' },
-    { label: 'Sessions',  href: '/supervisor/sessions', emoji: '📅' },
-    { label: 'Teachers',  href: '/supervisor/teachers', emoji: '👩‍🏫' },
-    { label: 'Trials',    href: '/supervisor/trials',   emoji: '🎯' },
+    { label: 'Dashboard', href: '/supervisor',           emoji: '📊' },
+    { label: 'Sessions',  href: '/supervisor/sessions',  emoji: '📅' },
+    { label: 'Teachers',  href: '/supervisor/teachers',  emoji: '👩‍🏫' },
+    { label: 'Trials',    href: '/supervisor/trials',    emoji: '🎯' },
+    { label: 'Reminders', href: '/supervisor/reminders', emoji: '🔔' },
   ],
 }
 
