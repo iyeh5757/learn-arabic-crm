@@ -18,6 +18,7 @@ export default function EditUserPage() {
   const [success, setSuccess] = useState('')
   const [profile, setProfile] = useState<any>(null)
   const [teacher, setTeacher] = useState<any>(null)
+  const [supervisors, setSupervisors] = useState<any[]>([])
   const [form, setForm] = useState({
     name: '', is_active: true,
     rate_per_session_usd: '',
@@ -25,6 +26,7 @@ export default function EditUserPage() {
     specialties: [] as string[],
     commission_amount: '',
     commission_currency: 'USD',
+    supervisor_id: '',
   })
 
   useEffect(() => {
@@ -32,10 +34,12 @@ export default function EditUserPage() {
       supabase.from('profiles').select('*').eq('id', id).single(),
       supabase.from('teachers').select('*').eq('user_id', id).single(),
       supabase.from('sales_config').select('*').eq('sales_user_id', id).single(),
-    ]).then(([{ data: p }, { data: t }, { data: s }]) => {
+      supabase.from('profiles').select('id, name').eq('role', 'supervisor').eq('is_active', true),
+    ]).then(([{ data: p }, { data: t }, { data: s }, { data: sup }]) => {
       if (p) { setProfile(p); setForm(f => ({ ...f, name: p.name, is_active: p.is_active })) }
-      if (t) { setTeacher(t); setForm(f => ({ ...f, rate_per_session_usd: t.rate_per_session_usd, languages: t.languages ?? [], specialties: t.specialties ?? [] })) }
+      if (t) { setTeacher(t); setForm(f => ({ ...f, rate_per_session_usd: t.rate_per_session_usd, languages: t.languages ?? [], specialties: t.specialties ?? [], supervisor_id: t.supervisor_id ?? '' })) }
       if (s) setForm(f => ({ ...f, commission_amount: s.commission_amount, commission_currency: s.commission_currency }))
+      setSupervisors(sup ?? [])
       setLoading(false)
     })
   }, [id])
@@ -56,6 +60,7 @@ export default function EditUserPage() {
         rate_per_session_usd: Number(form.rate_per_session_usd),
         languages: form.languages,
         specialties: form.specialties,
+        supervisor_id: form.supervisor_id || null,
       }).eq('user_id', id)
       if (teacherErr) { setError(teacherErr.message); setSaving(false); return }
     }
@@ -119,11 +124,20 @@ export default function EditUserPage() {
           <div style={card}>
             <div style={cardH}>👩‍🏫 Teacher Configuration</div>
             <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ maxWidth: '260px' }}>
-                <label style={lbl}>Rate Per Session (USD)</label>
-                <div style={{ position: 'relative' }}>
-                  <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6B7280' }}>$</span>
-                  <input type="number" step="0.01" min="0" style={{ ...inp, paddingLeft: '28px' }} value={form.rate_per_session_usd} onChange={e => setForm(f => ({...f, rate_per_session_usd: e.target.value}))} />
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                <div>
+                  <label style={lbl}>Rate Per Session (USD)</label>
+                  <div style={{ position: 'relative' }}>
+                    <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#6B7280' }}>$</span>
+                    <input type="number" step="0.01" min="0" style={{ ...inp, paddingLeft: '28px' }} value={form.rate_per_session_usd} onChange={e => setForm(f => ({...f, rate_per_session_usd: e.target.value}))} />
+                  </div>
+                </div>
+                <div>
+                  <label style={lbl}>Assigned Supervisor</label>
+                  <select style={inp} value={form.supervisor_id} onChange={e => setForm(f => ({...f, supervisor_id: e.target.value}))}>
+                    <option value="">No supervisor</option>
+                    {supervisors.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                  </select>
                 </div>
               </div>
               <div>

@@ -3,6 +3,9 @@ import { createClient } from '@/lib/supabase/server'
 
 export default async function SupervisorTeachersPage() {
   const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
 
@@ -13,6 +16,7 @@ export default async function SupervisorTeachersPage() {
       students:students(id, name, student_status, total_paid_classes, consumed_classes),
       sessions:sessions(id, session_type, attendance_status, session_date, trial_status)`)
     .eq('is_active', true)
+    .eq('supervisor_id', user.id)
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>

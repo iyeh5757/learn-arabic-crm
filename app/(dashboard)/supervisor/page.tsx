@@ -4,17 +4,26 @@ import Link from 'next/link'
 
 export default async function SupervisorDashboard() {
   const supabase = createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]
 
+  const { data: teachers } = await supabase
+    .from('teachers')
+    .select('id, rate_per_session_usd, profile:profiles!teachers_user_id_fkey(name, email), students:students(id, student_status)')
+    .eq('is_active', true)
+    .eq('supervisor_id', user.id)
+
+  const teacherIds = (teachers ?? []).map(t => t.id)
+
   const [
-    { data: teachers },
     { data: trialSessions },
     { data: recentSessions },
-  ] = await Promise.all([
-    supabase.from('teachers').select('id, rate_per_session_usd, profile:profiles!teachers_user_id_fkey(name, email), students:students(id, student_status)').eq('is_active', true),
-    supabase.from('sessions').select('*, student:students(name), teacher:teachers(profile:profiles!teachers_user_id_fkey(name))').eq('session_type', 'trial').order('session_date', { ascending: false }).limit(30),
-    supabase.from('sessions').select('*, student:students(name), teacher:teachers(profile:profiles!teachers_user_id_fkey(name))').order('session_date', { ascending: false }).limit(20),
+  ] = teacherIds.length === 0 ? [{ data: [] }, { data: [] }] : await Promise.all([
+    supabase.from('sessions').select('*, student:students(name), teacher:teachers(profile:profiles!teachers_user_id_fkey(name))').eq('session_type', 'trial').in('teacher_id', teacherIds).order('session_date', { ascending: false }).limit(30),
+    supabase.from('sessions').select('*, student:students(name), teacher:teachers(profile:profiles!teachers_user_id_fkey(name))').in('teacher_id', teacherIds).order('session_date', { ascending: false }).limit(20),
   ])
 
   const pendingTrials = (trialSessions ?? []).filter(s => s.trial_status === 'pending' || !s.trial_status)

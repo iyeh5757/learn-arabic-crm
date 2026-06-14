@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
     if (profile?.role !== 'admin') return NextResponse.json({ error: 'Forbidden - admin only' }, { status: 403 })
 
     const body = await req.json()
-    const { name, email, password, role, rate_per_session_usd, languages, specialties, commission_amount, commission_currency } = body
+    const { name, email, password, role, rate_per_session_usd, languages, specialties, commission_amount, commission_currency, supervisor_id } = body
 
     if (!name || !email || !password || !role) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
         rate_per_session_usd: Number(rate_per_session_usd) || 0,
         languages: languages || [],
         specialties: specialties || [],
+        supervisor_id: supervisor_id || null,
       })
     }
 
