@@ -157,6 +157,12 @@ export default function AdminUsersPage() {
                   </td>
                   <td style={{ padding: '14px 16px' }}>
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <Link
+                        href={`/admin/users/${u.id}/edit`}
+                        style={{ padding: '5px 12px', background: '#F3F4F6', color: '#374151', border: '1px solid #E5E7EB', borderRadius: '8px', fontSize: '12px', fontWeight: '600', textDecoration: 'none', whiteSpace: 'nowrap' }}
+                      >
+                        Edit
+                      </Link>
                       <button
                         onClick={() => { setResetTarget({ id: u.id, name: u.name }); setNewPassword(''); setResetMsg('') }}
                         style={{ padding: '5px 12px', background: '#EFF6FF', color: '#2563EB', border: '1px solid #BFDBFE', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' }}
