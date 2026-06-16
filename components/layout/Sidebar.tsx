@@ -113,7 +113,7 @@ export default function Sidebar({ profile }: { profile: Profile }) {
       </div>
 
       {/* Regular Nav */}
-      <nav style={{ padding: '6px 8px', flexShrink: 0 }}>
+      <nav style={{ padding: '6px 8px', flex: 1, overflowY: 'auto' }}>
         {regularNav.map(renderItem)}
       </nav>
 
