@@ -136,7 +136,7 @@ export default function NewUserPage() {
               <div><label style={lbl}>Commission Amount Per Conversion</label><input type="number" step="0.01" min="0" style={inp} value={form.commission_amount} onChange={e => setForm(f => ({...f, commission_amount: e.target.value}))} placeholder="e.g. 10" /></div>
               <div><label style={lbl}>Commission Currency</label>
                 <select style={inp} value={form.commission_currency} onChange={e => setForm(f => ({...f, commission_currency: e.target.value}))}>
-                  <option value="USD">USD</option><option value="GBP">GBP</option><option value="EUR">EUR</option><option value="AED">AED</option>
+                  <option value="USD">USD</option><option value="GBP">GBP</option><option value="EUR">EUR</option><option value="AED">AED</option><option value="EGP">EGP</option>
                 </select>
               </div>
             </div>

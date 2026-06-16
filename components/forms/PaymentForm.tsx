@@ -131,7 +131,7 @@ export default function PaymentForm({
               <option value="USD">USD</option>
               <option value="GBP">GBP</option>
               <option value="EUR">EUR</option>
-              <option value="AED">AED</option>
+              <option value="AED">AED</option><option value="EGP">EGP</option>
             </select>
           </div>
 

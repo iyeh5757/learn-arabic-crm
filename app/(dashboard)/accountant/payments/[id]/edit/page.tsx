@@ -47,7 +47,7 @@ export default function AccountantPaymentEditPage() {
   if (loading) return <div style={{ padding:'60px', textAlign:'center', color:'#6B7280' }}>Loading…</div>
   if (!form) return <div style={{ padding:'60px', textAlign:'center', color:'#DC2626' }}>Payment not found</div>
 
-  const sym = form.currency === 'USD' ? '$' : form.currency === 'GBP' ? '£' : form.currency === 'EUR' ? '€' : 'AED '
+  const sym = form.currency === 'USD' ? '$' : form.currency === 'GBP' ? '£' : form.currency === 'EUR' ? '€' : form.currency === 'AED' ? 'AED ' : 'EGP '
 
   return (
     <div style={{ maxWidth:'860px' }}>
@@ -82,7 +82,7 @@ export default function AccountantPaymentEditPage() {
             </div>
             <div><label style={lbl}>Currency</label>
               <select style={inp} value={form.currency} onChange={e=>setForm((f:any)=>({...f,currency:e.target.value}))}>
-                <option value="USD">USD</option><option value="GBP">GBP</option><option value="EUR">EUR</option><option value="AED">AED</option>
+                <option value="USD">USD</option><option value="GBP">GBP</option><option value="EUR">EUR</option><option value="AED">AED</option><option value="EGP">EGP</option>
               </select>
             </div>
             <div><label style={lbl}>Payment Method</label>

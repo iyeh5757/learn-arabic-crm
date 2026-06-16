@@ -40,7 +40,7 @@ function SalesNewPaymentInner() {
   }, [])
 
   const selectedStudent = students.find(s => s.id === form.student_id)
-  const sym = form.currency === 'USD' ? '$' : form.currency === 'GBP' ? '£' : form.currency === 'EUR' ? '€' : 'AED '
+  const sym = form.currency === 'USD' ? '$' : form.currency === 'GBP' ? '£' : form.currency === 'EUR' ? '€' : form.currency === 'AED' ? 'AED ' : 'EGP '
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -96,7 +96,7 @@ function SalesNewPaymentInner() {
             </div>
             <div><label style={lbl}>Currency</label>
               <select style={inp} value={form.currency} onChange={e=>setForm(f=>({...f,currency:e.target.value}))}>
-                <option value="USD">USD</option><option value="GBP">GBP</option><option value="EUR">EUR</option><option value="AED">AED</option>
+                <option value="USD">USD</option><option value="GBP">GBP</option><option value="EUR">EUR</option><option value="AED">AED</option><option value="EGP">EGP</option>
               </select>
             </div>
             <div><label style={lbl}>Payment Method</label>

@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
-const COUNTRIES = ['Egypt','Saudi Arabia','United Arab Emirates','United Kingdom','United States','Germany','France','Netherlands','Belgium','Switzerland','Austria','Canada','Australia','Jordan','Lebanon','Kuwait','Qatar','Bahrain','Oman','Morocco','Tunisia','Algeria','Libya','Sudan','Other']
-const COUNTRY_CURRENCY: Record<string, string> = { 'United Arab Emirates':'AED','Saudi Arabia':'AED','Kuwait':'AED','Qatar':'AED','Bahrain':'AED','Oman':'AED','United Kingdom':'GBP','Germany':'EUR','France':'EUR','Netherlands':'EUR','Belgium':'EUR','Switzerland':'EUR','Austria':'EUR','United States':'USD','Canada':'USD','Australia':'USD' }
+const COUNTRIES = ['Afghanistan','Albania','Algeria','Angola','Argentina','Armenia','Australia','Austria','Azerbaijan','Bahrain','Bangladesh','Belarus','Belgium','Bolivia','Bosnia and Herzegovina','Brazil','Bulgaria','Cambodia','Canada','Chile','China','Colombia','Croatia','Cyprus','Czech Republic','Denmark','Dominican Republic','Ecuador','Egypt','El Salvador','Estonia','Ethiopia','Finland','France','Georgia','Germany','Ghana','Greece','Guatemala','Honduras','Hungary','India','Indonesia','Iran','Iraq','Ireland','Israel','Italy','Jamaica','Japan','Jordan','Kazakhstan','Kenya','Kuwait','Lebanon','Libya','Luxembourg','Malaysia','Malta','Mexico','Morocco','Netherlands','New Zealand','Nigeria','Norway','Oman','Pakistan','Palestine','Peru','Philippines','Poland','Portugal','Qatar','Romania','Russia','Saudi Arabia','Senegal','Serbia','Singapore','Somalia','South Africa','South Korea','Spain','Sri Lanka','Sudan','Sweden','Switzerland','Syria','Tanzania','Thailand','Tunisia','Turkey','Uganda','Ukraine','United Arab Emirates','United Kingdom','United States','Uzbekistan','Venezuela','Vietnam','Yemen','Zimbabwe','Other']
+const COUNTRY_CURRENCY: Record<string, string> = { 'Egypt':'EGP','United Arab Emirates':'AED','Saudi Arabia':'AED','Kuwait':'AED','Qatar':'AED','Bahrain':'AED','Oman':'AED','United Kingdom':'GBP','Germany':'EUR','France':'EUR','Netherlands':'EUR','Belgium':'EUR','Switzerland':'EUR','Austria':'EUR','United States':'USD','Canada':'USD','Australia':'USD' }
 
 const PRESET_CLASSES = [4, 8, 12, 16, 20]
 
@@ -224,7 +224,7 @@ export default function NewStudentPage() {
                 <option value="USD">USD — US Dollar</option>
                 <option value="GBP">GBP — British Pound</option>
                 <option value="EUR">EUR — Euro</option>
-                <option value="AED">AED — UAE Dirham</option>
+                <option value="AED">AED — UAE Dirham</option><option value="EGP">EGP — Egyptian Pound</option>
               </select>
             </div>
             <div><label style={lbl}>Payment Method</label>

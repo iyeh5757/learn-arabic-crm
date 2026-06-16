@@ -96,7 +96,7 @@ function NewPaymentPageInner() {
   const card = { background: '#fff', border: '1px solid #E5E7EB', borderRadius: '14px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', marginBottom: '20px' }
   const cardH = { padding: '14px 22px', borderBottom: '1px solid #F3F4F6', fontWeight: '600' as const, fontSize: '15px', color: '#111827' }
   const grid = { padding: '20px 22px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }
-  const sym = form.currency === 'USD' ? '$' : form.currency === 'GBP' ? '£' : form.currency === 'EUR' ? '€' : 'AED '
+  const sym = form.currency === 'USD' ? '$' : form.currency === 'GBP' ? '£' : form.currency === 'EUR' ? '€' : form.currency === 'AED' ? 'AED ' : 'EGP '
 
   return (
     <div style={{ maxWidth: '860px' }}>
@@ -146,7 +146,7 @@ function NewPaymentPageInner() {
                 <option value="USD">USD</option>
                 <option value="GBP">GBP</option>
                 <option value="EUR">EUR</option>
-                <option value="AED">AED</option>
+                <option value="AED">AED</option><option value="EGP">EGP</option>
               </select>
             </div>
             <div>

@@ -20,6 +20,7 @@ const NAV: Record<string, { label: string; href: string; icon: any; isLead?: boo
     { label: 'Users',          href: '/admin/users',        icon: Users },
     { label: 'Reminders',      href: '/admin/reminders',    icon: Bell },
     { label: 'Reports',        href: '/admin/reports',      icon: BarChart3 },
+    { label: 'Analytics',      href: '/admin/analytics',    icon: TrendingUp },
     { label: '📤 Upload Leads',  href: '/admin/leads/upload', icon: null, isLead: true },
     { label: '📋 Leads Pipeline',href: '/admin/leads',        icon: null, isLead: true },
   ],

@@ -47,7 +47,7 @@ export default function EditPaymentPage() {
   const lbl = { display: 'block', fontSize: '11px', fontWeight: '600' as const, color: '#6B7280', textTransform: 'uppercase' as const, letterSpacing: '0.05em', marginBottom: '6px' }
   const card = { background: '#fff', border: '1px solid #E5E7EB', borderRadius: '14px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)', marginBottom: '20px' }
   const grid = { padding: '20px 22px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }
-  const sym = form ? (form.currency === 'USD' ? '$' : form.currency === 'GBP' ? '£' : form.currency === 'EUR' ? '€' : 'AED ') : '$'
+  const sym = form ? (form.currency === 'USD' ? '$' : form.currency === 'GBP' ? '£' : form.currency === 'EUR' ? '€' : form.currency === 'AED' ? 'AED ' : 'EGP ') : '$'
 
   if (loading) return <div style={{ padding: '60px', textAlign: 'center', color: '#6B7280' }}>Loading…</div>
   if (!form) return <div style={{ padding: '60px', textAlign: 'center', color: '#DC2626' }}>Payment not found</div>
@@ -89,7 +89,7 @@ export default function EditPaymentPage() {
                 <option value="USD">USD</option>
                 <option value="GBP">GBP</option>
                 <option value="EUR">EUR</option>
-                <option value="AED">AED</option>
+                <option value="AED">AED</option><option value="EGP">EGP</option>
               </select>
             </div>
             <div><label style={lbl}>Payment Method</label>

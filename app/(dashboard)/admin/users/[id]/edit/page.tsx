@@ -177,7 +177,7 @@ export default function EditUserPage() {
               <div>
                 <label style={lbl}>Currency</label>
                 <select style={inp} value={form.commission_currency} onChange={e => setForm(f => ({...f, commission_currency: e.target.value}))}>
-                  <option value="USD">USD</option><option value="GBP">GBP</option><option value="EUR">EUR</option><option value="AED">AED</option>
+                  <option value="USD">USD</option><option value="GBP">GBP</option><option value="EUR">EUR</option><option value="AED">AED</option><option value="EGP">EGP</option>
                 </select>
               </div>
             </div>
