@@ -14,6 +14,7 @@ const NAV: Record<string, { label: string; href: string; emoji: string }[]> = {
     { label: 'Users',          href: '/admin/users',        emoji: '👥' },
     { label: 'Reminders',      href: '/admin/reminders',    emoji: '🔔' },
     { label: 'Reports',        href: '/admin/reports',      emoji: '📈' },
+    { label: 'Analytics',      href: '/admin/analytics',    emoji: '🤖' },
     { label: 'Upload Leads',   href: '/admin/leads/upload', emoji: '📤' },
     { label: 'Leads Pipeline', href: '/admin/leads',        emoji: '📋' },
   ],
