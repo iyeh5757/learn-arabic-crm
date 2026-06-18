@@ -104,7 +104,10 @@ export default function SalesEditStudentPage() {
             <div><label style={lbl}>Session Duration</label>
               <select style={inp} value={form.session_duration ?? 60} onChange={e => setForm((f: any) => ({...f, session_duration: Number(e.target.value)}))}>
                 <option value={30}>30 minutes</option>
-                <option value={60}>60 minutes</option>
+                <option value={40}>40 minutes</option>
+                <option value={60}>60 minutes (1 hour)</option>
+                <option value={90}>90 minutes (1.5 hours)</option>
+                <option value={120}>120 minutes (2 hours)</option>
               </select>
             </div>
             <div><label style={lbl}>Student Status</label>

@@ -117,7 +117,10 @@ export default function StudentForm({ teachers, salesAgents, student, redirectTo
             <label className="label">Session Duration</label>
             <select className="input" value={form.session_duration} onChange={e => setForm(f => ({...f, session_duration: Number(e.target.value) as 30|60}))}>
               <option value={30}>30 minutes</option>
+              <option value={40}>40 minutes</option>
               <option value={60}>60 minutes (1 hour)</option>
+              <option value={90}>90 minutes (1.5 hours)</option>
+              <option value={120}>120 minutes (2 hours)</option>
             </select>
           </div>
           <div>
