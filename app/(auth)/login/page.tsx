@@ -4,10 +4,6 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
-const ROLE_HOME: Record<string, string> = {
-  admin: '/admin', teacher: '/teacher',
-  supervisor: '/supervisor', sales: '/sales', accountant: '/accountant',
-}
 
 export default function LoginPage() {
   const router = useRouter()
@@ -24,11 +20,7 @@ export default function LoginPage() {
     const supabase = createClient()
     const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
     if (authError) { setError(authError.message); setLoading(false); return }
-    const { data: profile } = await supabase
-      .from('profiles').select('role')
-      .eq('id', (await supabase.auth.getUser()).data.user?.id ?? '').single()
-    router.push(ROLE_HOME[profile?.role ?? 'sales'])
-    router.refresh()
+    router.push('/dashboard')
   }
 
   async function handleForgotPassword(e: React.FormEvent) {
