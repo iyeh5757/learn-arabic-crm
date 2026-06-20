@@ -60,6 +60,8 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   if (!profile) redirect('/login')
 
   const role = profile.role as string
+
+
   const links = NAV[role] ?? []
 
   // Separate leads links from regular links
