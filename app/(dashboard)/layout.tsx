@@ -1,8 +1,14 @@
 // app/(dashboard)/layout.tsx
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { headers } from 'next/headers'
 import Link from 'next/link'
 import { ReactNode } from 'react'
+
+const ROLE_PREFIX: Record<string, string> = {
+  admin: '/admin', teacher: '/teacher', sales: '/sales',
+  accountant: '/accountant', supervisor: '/supervisor',
+}
 
 const NAV: Record<string, { label: string; href: string; emoji: string }[]> = {
   admin: [
@@ -60,6 +66,13 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   if (!profile) redirect('/login')
 
   const role = profile.role as string
+
+  // Block access to routes belonging to other roles
+  const pathname = headers().get('x-pathname') ?? ''
+  const myPrefix = ROLE_PREFIX[role]
+  if (myPrefix && pathname && Object.values(ROLE_PREFIX).some(p => p !== myPrefix && pathname.startsWith(p))) {
+    redirect(myPrefix)
+  }
 
 
   const links = NAV[role] ?? []

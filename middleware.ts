@@ -30,17 +30,11 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // Enforce role-based route access
-  const role = request.cookies.get('user-role')?.value
-  if (role) {
-    const allowedPrefix = ROLE_PREFIX[role]
-    const otherPrefixes = Object.values(ROLE_PREFIX).filter(p => p !== allowedPrefix)
-    if (otherPrefixes.some(p => pathname.startsWith(p))) {
-      return NextResponse.redirect(new URL(allowedPrefix ?? '/dashboard', request.url))
-    }
-  }
+  // Pass pathname to server components via header
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-pathname', pathname)
 
-  return NextResponse.next()
+  return NextResponse.next({ request: { headers: requestHeaders } })
 }
 
 export const config = {
