@@ -1,11 +1,15 @@
 // app/(dashboard)/supervisor/page.tsx
 import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
 import Link from 'next/link'
 
 export default async function SupervisorDashboard() {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
+
+  const { data: _profileCheck } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (_profileCheck?.role !== 'supervisor') redirect('/dashboard')
 
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0]

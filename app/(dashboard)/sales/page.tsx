@@ -7,6 +7,8 @@ export default async function SalesDashboard() {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+  const { data: _rCheck } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (_rCheck?.role !== 'sales') redirect('/dashboard')
 
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()

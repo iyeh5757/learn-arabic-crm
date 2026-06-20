@@ -24,6 +24,9 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (profile?.role !== 'admin') redirect('/dashboard')
+
   const { start, end, label, param, isCurrentMonth } = getMonthRange(searchParams?.month)
 
   // Previous / next month params

@@ -7,6 +7,8 @@ export default async function TeacherDashboard() {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
+  const { data: _rCheck } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  if (_rCheck?.role !== 'teacher') redirect('/dashboard')
 
   const { data: teacher } = await supabase
     .from('teachers')
