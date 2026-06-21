@@ -3,7 +3,6 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { sendWhatsAppReminder, type SessionReminderData } from '@/lib/notifications/whatsapp'
-import { sendEmailReminder } from '@/lib/notifications/email'
 
 interface ReminderWindow {
   field:        'reminder_24h_sent' | 'reminder_12h_sent' | 'reminder_1h_sent'
@@ -59,10 +58,9 @@ export async function processSessionReminders(): Promise<{
       const teacherName  = (session.teacher as any)?.profile?.name ?? 'your teacher'
       const sessionType  = (session.session_type as any)?.name ?? 'Arabic'
       const studentName  = session.student_name ?? 'Student'
-      const studentEmail = session.student_email
       const studentPhone = session.student_phone
 
-      if (!studentEmail && !studentPhone) {
+      if (!studentPhone) {
         skipped++
         continue
       }
@@ -77,19 +75,9 @@ export async function processSessionReminders(): Promise<{
         hoursBeforeLabel: window.hoursBeforeLabel,
       }
 
-      // Send WhatsApp
-      if (studentPhone) {
-        const wa = await sendWhatsAppReminder(studentPhone, reminderData)
-        await logReminder(supabase, session.id, window.hoursBefore, 'whatsapp', studentPhone, wa)
-        wa.success ? sent++ : failed++
-      }
-
-      // Send Email
-      if (studentEmail) {
-        const em = await sendEmailReminder(studentEmail, reminderData)
-        await logReminder(supabase, session.id, window.hoursBefore, 'email', studentEmail, em)
-        em.success ? sent++ : failed++
-      }
+      const wa = await sendWhatsAppReminder(studentPhone, reminderData)
+      await logReminder(supabase, session.id, window.hoursBefore, 'whatsapp', studentPhone, wa)
+      wa.success ? sent++ : failed++
 
       // Mark this reminder as sent regardless of individual channel results
       // so we don't retry the same session every hour
@@ -107,7 +95,7 @@ async function logReminder(
   supabase: any,
   sessionId: string,
   hoursBefore: number,
-  channel: 'whatsapp' | 'email',
+  channel: 'whatsapp',
   sentTo: string,
   result: { success: boolean; error?: string }
 ) {
