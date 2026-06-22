@@ -28,7 +28,7 @@ export default function GoogleStatus() {
       const res = await fetch('/api/calendar/sync-google', { method: 'POST' })
       const data = await res.json()
       if (res.ok && data.ok) {
-        setSyncMsg(`✅ Synced — checked ${data.checked}, ${data.cancelled} cancelled, ${data.rescheduled} rescheduled from Google.`)
+        setSyncMsg(`✅ Synced — checked ${data.checked}, ${data.removed} removed, ${data.rescheduled} rescheduled from Google.`)
       } else {
         setSyncMsg(`❌ ${data.error ?? 'Sync failed'}`)
       }

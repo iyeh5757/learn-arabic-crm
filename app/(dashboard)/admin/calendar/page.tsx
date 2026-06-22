@@ -22,7 +22,7 @@ export default async function CalendarPage() {
     { data: supervisorRows },
   ] = await Promise.all([
     supabase.from('session_type_config').select('id, name, color').eq('is_active', true).order('sort_order'),
-    supabase.from('teachers').select('id, supervisor_id, profile:profiles!teachers_user_id_fkey(name)').order('id'),
+    supabase.from('teachers').select('id, supervisor_id, profile:profiles!teachers_user_id_fkey(name, email)').order('id'),
     supabase.from('students').select('id, name, email, phone').in('student_status', ['active', 'trial']).order('name'),
     supabase.from('profiles').select('id, name').eq('role', 'supervisor').order('name'),
   ])
@@ -30,6 +30,7 @@ export default async function CalendarPage() {
   const teachers = (teacherRows ?? []).map((t: any) => ({
     id:            t.id,
     name:          t.profile?.name ?? 'Unknown',
+    email:         t.profile?.email ?? '',
     supervisor_id: t.supervisor_id ?? null,
   }))
 

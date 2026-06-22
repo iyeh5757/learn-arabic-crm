@@ -60,7 +60,7 @@ export async function POST(req: Request) {
     student_email, student_phone, start_at, end_at,
     duration_minutes, notes, sales_notes, supervisor_notes,
     recurring_rule_id, force_booked, force_booked_reason,
-    open_access, auto_record, teacher_cohost, cohost_email,
+    open_access, auto_record, cohost_emails,
   } = body
 
   if (!teacher_id || !start_at || !end_at || !duration_minutes) {
@@ -112,9 +112,9 @@ export async function POST(req: Request) {
         const space = await createMeetSpace({ openAccess: !!open_access, autoRecord: !!auto_record })
         if (space?.meetUri) {
           // Co-hosts (best-effort)
-          const cohosts: string[] = []
-          if (teacher_cohost && teacherEmail) cohosts.push(teacherEmail)
-          if (cohost_email) cohosts.push(String(cohost_email).trim())
+          const cohosts: string[] = Array.isArray(cohost_emails)
+            ? cohost_emails.map((e: any) => String(e).trim()).filter(Boolean)
+            : []
           if (cohosts.length) {
             const r = await addMeetCoHosts(space.spaceName, cohosts)
             console.log('[Meet] co-hosts:', r)

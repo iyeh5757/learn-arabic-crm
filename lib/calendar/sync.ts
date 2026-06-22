@@ -7,12 +7,12 @@ import { getCalendarEvent, isGoogleConfigured } from './google'
 
 export async function syncFromGoogle(): Promise<{
   checked: number
-  cancelled: number
+  removed: number
   rescheduled: number
   skipped: number
 }> {
   if (!isGoogleConfigured()) {
-    return { checked: 0, cancelled: 0, rescheduled: 0, skipped: 0 }
+    return { checked: 0, removed: 0, rescheduled: 0, skipped: 0 }
   }
 
   const supabase = createClient()
@@ -25,7 +25,7 @@ export async function syncFromGoogle(): Promise<{
     .in('status', ['scheduled', 'rescheduled'])
     .gte('end_at', cutoff)
 
-  let cancelled = 0, rescheduled = 0, skipped = 0
+  let removed = 0, rescheduled = 0, skipped = 0
 
   for (const s of sessions ?? []) {
     let ev
@@ -34,13 +34,12 @@ export async function syncFromGoogle(): Promise<{
     if (!ev) { skipped++; continue }
 
     if (ev.cancelled) {
-      await supabase.from('calendar_sessions')
-        .update({ status: 'cancelled', updated_at: new Date().toISOString() })
-        .eq('id', s.id)
+      // Deleted in Google → remove from CRM entirely (avoid stale/confusing rows)
       await supabase.from('calendar_audit_log').insert({
-        event_id: s.id, action: 'cancelled', source: 'google',
+        event_id: s.id, action: 'deleted', source: 'google',
       })
-      cancelled++
+      await supabase.from('calendar_sessions').delete().eq('id', s.id)
+      removed++
     } else if (ev.startIso && ev.endIso) {
       const newStart = new Date(ev.startIso).toISOString()
       const newEnd   = new Date(ev.endIso).toISOString()
@@ -58,5 +57,5 @@ export async function syncFromGoogle(): Promise<{
     }
   }
 
-  return { checked: (sessions ?? []).length, cancelled, rescheduled, skipped }
+  return { checked: (sessions ?? []).length, removed, rescheduled, skipped }
 }
