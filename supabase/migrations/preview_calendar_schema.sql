@@ -219,6 +219,22 @@ create policy "Teacher manages own availability" on teacher_availability
 create policy "Admin manages all availability" on teacher_availability
   for all to public using (current_user_role() = 'admin');
 
+-- calendar_blocks
+create policy "Teacher manages own blocks" on calendar_blocks
+  for all to public using (
+    current_user_role() = 'teacher' and
+    exists (select 1 from teachers t where t.id = calendar_blocks.teacher_id and t.user_id = auth.uid())
+  );
+create policy "Admin manages all blocks" on calendar_blocks
+  for all to public using (current_user_role() = 'admin');
+create policy "Supervisor manages team blocks" on calendar_blocks
+  for all to public using (
+    current_user_role() = 'supervisor' and
+    exists (select 1 from teachers t where t.id = calendar_blocks.teacher_id and t.supervisor_id = auth.uid())
+  );
+create policy "Sales reads blocks" on calendar_blocks
+  for select to public using (current_user_role() = 'sales');
+
 -- google_integrations: own row only
 create policy "User manages own google integration" on google_integrations
   for all to public using (user_id = auth.uid());

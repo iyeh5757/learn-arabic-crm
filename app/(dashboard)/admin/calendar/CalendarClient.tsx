@@ -27,6 +27,8 @@ interface Props {
   teachers: Teacher[]
   supervisors: Supervisor[]
   students: Student[]
+  canDelete?: boolean            // hard-delete allowed (admin only)
+  showSupervisorFilter?: boolean // show the supervisor filter dropdown
 }
 
 const EMPTY_FORM = {
@@ -62,7 +64,7 @@ function cairoToUtc(dateStr: string, timeStr: string): Date {
   return new Date(guess.getTime() - offset * 60000)
 }
 
-export default function CalendarClient({ sessionTypes, teachers, supervisors, students }: Props) {
+export default function CalendarClient({ sessionTypes, teachers, supervisors, students, canDelete = true, showSupervisorFilter = true }: Props) {
   const calRef = useRef<any>(null)
   const [filterTeacher, setFilterTeacher]       = useState('')
   const [filterSupervisor, setFilterSupervisor] = useState('')
@@ -341,6 +343,7 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
             {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
         </div>
+        {showSupervisorFilter && (
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
           <span style={{ fontSize: '12px', color: '#94A3B8' }}>🔍 Supervisor</span>
           <select value={filterSupervisor} onChange={e => onSupervisorFilter(e.target.value)}
@@ -349,6 +352,7 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
             {supervisors.map(s => <option key={s.id} value={s.id}>{s.name}'s teachers</option>)}
           </select>
         </div>
+        )}
         {(filterTeacher || filterSupervisor) && (
           <button onClick={clearFilters}
             style={{ padding: '6px 12px', background: '#F1F5F9', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', color: '#475569' }}>
@@ -469,14 +473,16 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
                     style={{ flex: 1, padding: '9px', background: '#FEF3C7', color: '#92400E', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
                     Cancel Session
                   </button>
-                  <button onClick={deleteSession} disabled={busy}
-                    style={{ flex: 1, padding: '9px', background: '#FEE2E2', color: '#B91C1C', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
-                    Delete
-                  </button>
+                  {canDelete && (
+                    <button onClick={deleteSession} disabled={busy}
+                      style={{ flex: 1, padding: '9px', background: '#FEE2E2', color: '#B91C1C', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
+                      Delete
+                    </button>
+                  )}
                 </div>
               </div>
             )}
-            {selected.status === 'cancelled' && (
+            {selected.status === 'cancelled' && canDelete && (
               <div style={{ padding: '0 22px 20px' }}>
                 <button onClick={deleteSession} disabled={busy}
                   style={{ width: '100%', padding: '9px', background: '#FEE2E2', color: '#B91C1C', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
