@@ -5,7 +5,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { sendWhatsAppReminder } from '@/lib/notifications/whatsapp'
+import { sendWhatsAppReminder, listInstances } from '@/lib/notifications/whatsapp'
 
 export const runtime = 'nodejs'
 
@@ -37,7 +37,16 @@ export async function POST(req: Request) {
   })
 
   if (!result.success) {
-    return NextResponse.json({ ok: false, error: result.error }, { status: 502 })
+    // On failure, list the instances that actually exist to help diagnose
+    // name mismatches (e.g. a "Not Found" 404).
+    let hint = ''
+    if ((result.error ?? '').toLowerCase().includes('not found')) {
+      const { names, error: listErr } = await listInstances()
+      if (names.length) hint = ` — Instances found on server: [${names.join(', ')}]. Set EVOLUTION_INSTANCE to one of these.`
+      else if (listErr) hint = ` — Could not list instances: ${listErr}`
+      else hint = ' — No instances exist on the server. Create one in the Evolution manager.'
+    }
+    return NextResponse.json({ ok: false, error: (result.error ?? 'Failed') + hint }, { status: 502 })
   }
   return NextResponse.json({ ok: true, message: 'Test message sent' })
 }

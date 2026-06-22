@@ -71,6 +71,26 @@ function normalisePhone(phone: string): string {
   return p
 }
 
+// Diagnostic: list the instance names that actually exist on the server.
+export async function listInstances(): Promise<{ names: string[]; error?: string }> {
+  if (!API_URL || !API_KEY) return { names: [], error: 'Credentials not configured' }
+  try {
+    const res = await fetch(`${API_URL}/instance/fetchInstances`, {
+      headers: { apikey: API_KEY },
+    })
+    const json = await res.json()
+    if (!res.ok) return { names: [], error: json?.message ?? `HTTP ${res.status}` }
+    // Evolution returns an array; instance name is at .name or .instance.instanceName
+    const arr = Array.isArray(json) ? json : []
+    const names = arr.map((i: any) =>
+      i?.name ?? i?.instance?.instanceName ?? i?.instanceName ?? JSON.stringify(i).slice(0, 40)
+    )
+    return { names }
+  } catch (err: any) {
+    return { names: [], error: err?.message ?? 'Network error' }
+  }
+}
+
 export async function sendWhatsAppReminder(
   phone: string,
   data: SessionReminderData
