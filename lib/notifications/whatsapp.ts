@@ -6,9 +6,15 @@
 //   EVOLUTION_API_KEY   the global apikey for your instance
 //   EVOLUTION_INSTANCE  the instance name you created (e.g. "learnarabic")
 
-const API_URL  = process.env.EVOLUTION_API_URL?.replace(/\/+$/, '')
-const API_KEY  = process.env.EVOLUTION_API_KEY
-const INSTANCE = process.env.EVOLUTION_INSTANCE
+// Strip any non-printable / non-ASCII characters that can sneak in when
+// pasting credentials (e.g. U+2028 line separators) — HTTP headers must be ASCII.
+function clean(v?: string): string {
+  return (v ?? '').replace(/[^\x20-\x7E]/g, '').trim()
+}
+
+const API_URL  = clean(process.env.EVOLUTION_API_URL).replace(/\/+$/, '')
+const API_KEY  = clean(process.env.EVOLUTION_API_KEY)
+const INSTANCE = clean(process.env.EVOLUTION_INSTANCE)
 
 export interface SessionReminderData {
   studentName:  string
