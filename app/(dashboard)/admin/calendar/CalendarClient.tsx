@@ -36,6 +36,7 @@ const EMPTY_FORM = {
   notes: '', recurring: false,
   days: [] as number[],
   force: false, force_reason: '',
+  open_access: true, auto_record: false,
 }
 
 // Offset (minutes) of a timezone at a given instant, via Intl — DST-safe.
@@ -171,6 +172,8 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
       notes:            form.notes,
       force_booked:     force,
       force_booked_reason: force ? form.force_reason : null,
+      open_access:      form.open_access,
+      auto_record:      form.auto_record,
     }
 
     const res = await fetch('/api/calendar/sessions', {
@@ -591,6 +594,31 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
                     </div>
                   </div>
                 )}
+              </div>
+
+              {/* Google Meet options */}
+              <div style={{ background: '#F8FAFC', borderRadius: '12px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ fontSize: '13px', fontWeight: '700', color: '#334155' }}>🎥 Google Meet options</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <button type="button" onClick={() => setForm(f => ({ ...f, open_access: !f.open_access }))}
+                    style={{ width: '42px', height: '24px', borderRadius: '12px', background: form.open_access ? '#0D1B2A' : '#CBD5E1', border: 'none', cursor: 'pointer', position: 'relative', flexShrink: 0, transition: 'background 0.2s' }}>
+                    <span style={{ position: 'absolute', width: '18px', height: '18px', borderRadius: '50%', background: '#fff', top: '3px', left: form.open_access ? '21px' : '3px', transition: 'left 0.2s' }} />
+                  </button>
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: '#334155' }}>Open access</div>
+                    <div style={{ fontSize: '11px', color: '#94A3B8' }}>Anyone with the link joins directly — no knocking</div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <button type="button" onClick={() => setForm(f => ({ ...f, auto_record: !f.auto_record }))}
+                    style={{ width: '42px', height: '24px', borderRadius: '12px', background: form.auto_record ? '#0D1B2A' : '#CBD5E1', border: 'none', cursor: 'pointer', position: 'relative', flexShrink: 0, transition: 'background 0.2s' }}>
+                    <span style={{ position: 'absolute', width: '18px', height: '18px', borderRadius: '50%', background: '#fff', top: '3px', left: form.auto_record ? '21px' : '3px', transition: 'left 0.2s' }} />
+                  </button>
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: '#334155' }}>Auto-record</div>
+                    <div style={{ fontSize: '11px', color: '#94A3B8' }}>Recording saves to the organizer's Google Drive</div>
+                  </div>
+                </div>
               </div>
 
               {/* Conflict */}

@@ -25,12 +25,15 @@ function base64url(input: Buffer | string): string {
     .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_')
 }
 
-async function getAccessToken(): Promise<string> {
+const SCOPE_CALENDAR = 'https://www.googleapis.com/auth/calendar'
+const SCOPE_MEET     = 'https://www.googleapis.com/auth/meetings.space.created'
+
+async function getAccessToken(scope: string = SCOPE_CALENDAR): Promise<string> {
   const now = Math.floor(Date.now() / 1000)
   const header = { alg: 'RS256', typ: 'JWT' }
   const claims = {
     iss:   SA_EMAIL,
-    scope: 'https://www.googleapis.com/auth/calendar',
+    scope,
     aud:   'https://oauth2.googleapis.com/token',
     sub:   IMPERSONATE,        // impersonate the Workspace user
     iat:   now,
@@ -172,6 +175,59 @@ export async function updateCalendarEventTime(
       }),
     }
   )
+}
+
+// Applies Meet settings (open access, auto-record) to an existing Meet link.
+// Best-effort: each setting is patched separately so one failing (e.g. an
+// unsupported plan) doesn't block the other. Returns what was applied.
+export async function configureMeetSpace(
+  meetLink: string,
+  opts: { openAccess?: boolean; autoRecord?: boolean }
+): Promise<{ openAccess: boolean; autoRecord: boolean; error?: string }> {
+  const applied = { openAccess: false, autoRecord: false, error: undefined as string | undefined }
+  if (!isGoogleConfigured() || !meetLink) return applied
+
+  const code = meetLink.split('/').filter(Boolean).pop()
+  if (!code) return applied
+
+  let token: string
+  try { token = await getAccessToken(SCOPE_MEET) }
+  catch (e: any) { applied.error = `Meet auth failed: ${e?.message}`; return applied }
+
+  // Resolve the canonical space resource name from the meeting code
+  let spaceName: string
+  try {
+    const getRes = await fetch(`https://meet.googleapis.com/v2/spaces/${code}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const space = await getRes.json()
+    if (!getRes.ok) { applied.error = space?.error?.message ?? `space lookup ${getRes.status}`; return applied }
+    spaceName = space.name   // "spaces/xxxx"
+  } catch (e: any) { applied.error = e?.message; return applied }
+
+  async function patch(config: any, mask: string): Promise<boolean> {
+    const res = await fetch(`https://meet.googleapis.com/v2/${spaceName}?updateMask=${encodeURIComponent(mask)}`, {
+      method:  'PATCH',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ config }),
+    })
+    return res.ok
+  }
+
+  if (opts.openAccess) {
+    try { applied.openAccess = await patch({ accessType: 'OPEN' }, 'config.accessType') }
+    catch { /* ignore */ }
+  }
+  if (opts.autoRecord) {
+    try {
+      applied.autoRecord = await patch(
+        { artifactConfig: { recordingConfig: { autoRecordingGeneration: 'ON' } } },
+        'config.artifactConfig.recordingConfig.autoRecordingGeneration'
+      )
+    } catch { /* ignore */ }
+  }
+
+  return applied
 }
 
 // Cancels/deletes a Google Calendar event and notifies attendees.

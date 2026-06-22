@@ -1,7 +1,7 @@
 // app/api/calendar/sessions/route.ts
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { createCalendarEventWithMeet, isGoogleConfigured } from '@/lib/calendar/google'
+import { createCalendarEventWithMeet, configureMeetSpace, isGoogleConfigured } from '@/lib/calendar/google'
 import { remindSessionIfDue } from '@/lib/calendar/reminders'
 
 export const runtime = 'nodejs'
@@ -60,6 +60,7 @@ export async function POST(req: Request) {
     student_email, student_phone, start_at, end_at,
     duration_minutes, notes, sales_notes, supervisor_notes,
     recurring_rule_id, force_booked, force_booked_reason,
+    open_access, auto_record,
   } = body
 
   if (!teacher_id || !start_at || !end_at || !duration_minutes) {
@@ -104,6 +105,12 @@ export async function POST(req: Request) {
         attendees:   [student_email, teacherEmail].filter(Boolean),
       })
       if (ev) { googleEventId = ev.eventId; googleMeetLink = ev.meetLink }
+
+      // Apply Open-access / Auto-record settings to the Meet (best-effort)
+      if (googleMeetLink && (open_access || auto_record)) {
+        const res = await configureMeetSpace(googleMeetLink, { openAccess: !!open_access, autoRecord: !!auto_record })
+        console.log('[Calendar] Meet settings applied:', res)
+      }
     } catch (e: any) {
       console.error('[Calendar] Google event creation failed:', e?.message)
       // continue without Meet link
