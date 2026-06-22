@@ -210,10 +210,15 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
     if (api) { api.gotoDate(start); api.refetchEvents() }
     setModal(false); setSaving(false)
 
-    // Surface co-host result so we know if Google accepted it
-    const ch = data?._meet?.cohosts
-    if (ch && (ch.error || (ch.added && ch.added.length < (payload.cohost_emails?.length ?? 0)))) {
-      alert(`Co-host result:\n• Added: ${(ch.added ?? []).join(', ') || 'none'}\n• Error: ${ch.error ?? 'none'}`)
+    // Surface the Meet settings result so we know exactly what Google applied
+    const m = data?._meet
+    if (m) {
+      const parts: string[] = []
+      if (form.open_access) parts.push(`Open access: ${m.openAccess ? 'on' : 'failed'}`)
+      if (form.auto_record) parts.push(`Auto-record setting: ${m.autoRecord ? 'ENABLED ✓' : 'NOT enabled ✗'}`)
+      if (m.cohosts) parts.push(`Co-hosts added: ${(m.cohosts.added ?? []).join(', ') || 'none'}${m.cohosts.error ? ` (error: ${m.cohosts.error})` : ''}`)
+      if (m.spaceError) parts.push(`Meet error: ${m.spaceError}`)
+      if (parts.length) alert('Meeting settings applied:\n• ' + parts.join('\n• '))
     }
   }
 
