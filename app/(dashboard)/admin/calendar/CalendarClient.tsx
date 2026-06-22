@@ -41,6 +41,8 @@ const EMPTY_FORM = {
   open_access: true, auto_record: false,
 }
 
+const TEACHER_COLORS = ['#2563EB','#16A34A','#9333EA','#EA580C','#0891B2','#DB2777','#CA8A04','#4F46E5','#059669','#DC2626','#7C3AED','#0D9488']
+
 // Offset (minutes) of a timezone at a given instant, via Intl — DST-safe.
 function tzOffsetMinutes(timeZone: string, date: Date): number {
   const dtf = new Intl.DateTimeFormat('en-US', {
@@ -84,6 +86,12 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
   const filterSupervisorRef = useRef('')
   const supabase = createClient()
 
+  const teacherColor = useMemo(() => {
+    const map: Record<string, string> = {}
+    teachers.forEach((t, i) => { map[t.id] = TEACHER_COLORS[i % TEACHER_COLORS.length] })
+    return map
+  }, [teachers])
+
   const loadEvents = useCallback(async (fetchInfo: any, successCb: any, failureCb: any) => {
     try {
       const params: Record<string, string> = { start: fetchInfo.startStr, end: fetchInfo.endStr }
@@ -102,18 +110,24 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
       setLoadError('')
       const arr = Array.isArray(data) ? data : []
       const showTeacher = !filterTeacherRef.current  // include teacher name unless viewing one teacher
-      const sessionEvents = arr.map((s: any) => ({
-        id:    `session-${s.id}`,
-        title: showTeacher
-          ? `${s.teacher?.profile?.name ?? '—'} · ${s.student_name ?? 'Session'}`
-          : `${s.student_name ?? 'Session'} · ${s.session_type?.name ?? ''}`,
-        start: s.start_at,
-        end:   s.end_at,
-        backgroundColor: s.status === 'cancelled' ? '#E2E8F0' : (s.session_type?.color ?? '#64748B'),
-        borderColor:     s.status === 'cancelled' ? '#CBD5E1' : (s.session_type?.color ?? '#64748B'),
-        textColor:       s.status === 'cancelled' ? '#94A3B8' : '#fff',
-        extendedProps:   { kind: 'session', ...s },
-      }))
+      const sessionEvents = arr.map((s: any) => {
+        // When viewing multiple teachers, colour by teacher; otherwise by dialect
+        const tColor = teacherColor[s.teacher?.id] ?? '#64748B'
+        const typeColor = s.session_type?.color ?? '#64748B'
+        const fill = s.status === 'cancelled' ? '#E2E8F0' : (showTeacher ? tColor : typeColor)
+        return {
+          id:    `session-${s.id}`,
+          title: showTeacher
+            ? `${s.teacher?.profile?.name ?? '—'} · ${s.student_name ?? 'Session'}`
+            : `${s.student_name ?? 'Session'} · ${s.session_type?.name ?? ''}`,
+          start: s.start_at,
+          end:   s.end_at,
+          backgroundColor: fill,
+          borderColor:     s.status === 'cancelled' ? '#CBD5E1' : (showTeacher ? typeColor : typeColor),
+          textColor:       s.status === 'cancelled' ? '#94A3B8' : '#fff',
+          extendedProps:   { kind: 'session', ...s },
+        }
+      })
 
       // Blocked (unavailable) time — shown grey so schedulers can see availability
       let blockEvents: any[] = []
@@ -382,6 +396,19 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
           </button>
         )}
       </div>
+
+      {/* Per-teacher colour legend (shown when viewing multiple teachers) */}
+      {!filterTeacher && teachers.length > 1 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', marginBottom: '12px', background: '#fff', border: '1px solid #F1F5F9', borderRadius: '12px', padding: '10px 16px' }}>
+          <span style={{ fontSize: '11px', fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Teachers</span>
+          {teachers.map(t => (
+            <span key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '12px', color: '#475569' }}>
+              <span style={{ width: '11px', height: '11px', borderRadius: '3px', background: teacherColor[t.id], display: 'inline-block' }} />
+              {t.name}
+            </span>
+          ))}
+        </div>
+      )}
 
       <div style={{ background: '#fff', borderRadius: '18px', padding: '18px 20px', boxShadow: '0 1px 3px rgba(15,23,42,0.06), 0 1px 2px rgba(15,23,42,0.04)', border: '1px solid #F1F5F9' }}>
         <FullCalendar
