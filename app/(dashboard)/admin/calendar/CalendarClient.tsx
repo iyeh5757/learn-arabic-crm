@@ -231,8 +231,9 @@ export default function CalendarClient({ sessionTypes, teachers, students }: Pro
           initialView="timeGridWeek"
           headerToolbar={{ left: 'prev,next today', center: 'title', right: 'timeGridWeek,timeGridDay,dayGridMonth,listWeek' }}
           buttonText={{ today: 'Today', week: 'Week', day: 'Day', month: 'Month', list: 'Agenda' }}
-          slotMinTime="07:00:00"
-          slotMaxTime="23:00:00"
+          slotMinTime="00:00:00"
+          slotMaxTime="24:00:00"
+          scrollTime="08:00:00"
           allDaySlot={false}
           nowIndicator
           selectable
