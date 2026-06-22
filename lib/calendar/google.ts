@@ -199,11 +199,10 @@ export async function createCalendarEventWithLink(
 ): Promise<CreatedEvent | null> {
   if (!isGoogleConfigured()) return null
   const token = await getAccessToken()
-  const description = `${input.description ? input.description + '\n\n' : ''}Join Google Meet:\n${meetLink}`
+  const description = `${input.description ? input.description + '\n\n' : ''}🎥 Join Google Meet: ${meetLink}`
   const body = {
     summary:     input.summary,
     description,
-    location:    meetLink,
     start: { dateTime: input.startIso, timeZone: input.timezone },
     end:   { dateTime: input.endIso,   timeZone: input.timezone },
     attendees: input.attendees.filter(Boolean).map(email => ({ email })),
