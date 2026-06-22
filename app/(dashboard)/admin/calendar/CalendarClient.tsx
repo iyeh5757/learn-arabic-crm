@@ -187,6 +187,16 @@ export default function CalendarClient({ sessionTypes, teachers, students }: Pro
     setCopied(true); setTimeout(() => setCopied(false), 1500)
   }
 
+  async function remindNow() {
+    if (!selected) return
+    setBusy(true)
+    const res = await fetch(`/api/calendar/sessions/${selected.id}/remind`, { method: 'POST' })
+    const data = await res.json()
+    setBusy(false)
+    if (res.ok) alert('✅ WhatsApp reminder sent!')
+    else alert(`❌ ${data.error ?? 'Failed to send'}`)
+  }
+
   function toggleDay(d: number) {
     setForm(f => ({ ...f, days: f.days.includes(d) ? f.days.filter(x => x !== d) : [...f.days, d] }))
   }
@@ -293,15 +303,21 @@ export default function CalendarClient({ sessionTypes, teachers, students }: Pro
 
             {/* Actions */}
             {selected.status !== 'cancelled' && (
-              <div style={{ padding: '0 22px 20px', display: 'flex', gap: '8px' }}>
-                <button onClick={cancelSession} disabled={busy}
-                  style={{ flex: 1, padding: '9px', background: '#FEF3C7', color: '#92400E', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
-                  Cancel Session
+              <div style={{ padding: '0 22px 20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <button onClick={remindNow} disabled={busy}
+                  style={{ width: '100%', padding: '9px', background: '#DCFCE7', color: '#15803D', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
+                  📲 Send WhatsApp reminder now
                 </button>
-                <button onClick={deleteSession} disabled={busy}
-                  style={{ flex: 1, padding: '9px', background: '#FEE2E2', color: '#B91C1C', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
-                  Delete
-                </button>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button onClick={cancelSession} disabled={busy}
+                    style={{ flex: 1, padding: '9px', background: '#FEF3C7', color: '#92400E', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
+                    Cancel Session
+                  </button>
+                  <button onClick={deleteSession} disabled={busy}
+                    style={{ flex: 1, padding: '9px', background: '#FEE2E2', color: '#B91C1C', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
+                    Delete
+                  </button>
+                </div>
               </div>
             )}
             {selected.status === 'cancelled' && (

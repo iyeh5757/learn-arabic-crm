@@ -127,6 +127,34 @@ export async function createCalendarEventWithMeet(
   return { eventId: json.id, meetLink, htmlLink: json.htmlLink ?? null }
 }
 
+export interface FetchedEvent {
+  exists:    boolean
+  cancelled: boolean
+  startIso?: string
+  endIso?:   string
+}
+
+// Reads the current state of a Google Calendar event (for inbound sync).
+// Returns cancelled=true if the event was deleted or cancelled in Google.
+export async function getCalendarEvent(eventId: string): Promise<FetchedEvent | null> {
+  if (!isGoogleConfigured() || !eventId) return null
+  const token = await getAccessToken()
+  const res = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CALENDAR_ID)}/events/${eventId}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  )
+  if (res.status === 404 || res.status === 410) return { exists: false, cancelled: true }
+  const json = await res.json()
+  if (!res.ok) throw new Error(json.error?.message ?? 'Google fetch event failed')
+  if (json.status === 'cancelled') return { exists: true, cancelled: true }
+  return {
+    exists:    true,
+    cancelled: false,
+    startIso:  json.start?.dateTime ?? undefined,
+    endIso:    json.end?.dateTime ?? undefined,
+  }
+}
+
 // Cancels/deletes a Google Calendar event and notifies attendees.
 export async function deleteCalendarEvent(eventId: string): Promise<void> {
   if (!isGoogleConfigured() || !eventId) return
