@@ -122,10 +122,9 @@ export default function TeacherCalendar() {
     else { const d = await res.json(); alert(`Couldn't block: ${d?.error ?? 'error'}`) }
   }
 
-  async function removeBlock(id: string) {
-    if (!confirm('Remove this blocked time? You will be available again.')) return
+  async function removeBlock(id: string, scope: 'one' | 'future' | 'all' = 'one') {
     setBusy(true)
-    const res = await fetch(`/api/calendar/blocks/${id}`, { method: 'DELETE' })
+    const res = await fetch(`/api/calendar/blocks/${id}?scope=${scope}`, { method: 'DELETE' })
     setBusy(false)
     if (res.ok) { setSelected(null); refresh() }
     else alert('Failed to remove block')
@@ -268,11 +267,30 @@ export default function TeacherCalendar() {
                 <div style={{ fontSize:'15px', fontWeight:'800', color:'#0F172A', marginBottom:'8px' }}>🚫 Blocked time</div>
                 <div style={{ fontSize:'13px', color:'#475569', marginBottom:'14px' }}>
                   {new Date(selected.data.start_at).toLocaleString('en-GB', { timeZone:'Africa/Cairo', weekday:'short', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}
+                  {selected.data.recurrence_group_id && <span style={{ display:'block', fontSize:'12px', color:'#8B5CF6', fontWeight:'700', marginTop:'4px' }}>🔁 Part of a repeating block</span>}
                 </div>
-                <button onClick={() => removeBlock(selected.data.id)} disabled={busy}
-                  style={{ width:'100%', padding:'9px', background:'#FEE2E2', color:'#B91C1C', border:'none', borderRadius:'10px', fontSize:'12px', fontWeight:'700', cursor:'pointer' }}>
-                  Remove block (become available)
-                </button>
+                {selected.data.recurrence_group_id ? (
+                  <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
+                    <div style={{ fontSize:'11px', fontWeight:'700', color:'#64748B', textTransform:'uppercase' }}>Remove…</div>
+                    <button onClick={() => removeBlock(selected.data.id, 'one')} disabled={busy}
+                      style={{ width:'100%', padding:'9px', background:'#F1F5F9', color:'#334155', border:'none', borderRadius:'10px', fontSize:'12px', fontWeight:'700', cursor:'pointer' }}>
+                      Only this one
+                    </button>
+                    <button onClick={() => removeBlock(selected.data.id, 'future')} disabled={busy}
+                      style={{ width:'100%', padding:'9px', background:'#FEF3C7', color:'#92400E', border:'none', borderRadius:'10px', fontSize:'12px', fontWeight:'700', cursor:'pointer' }}>
+                      This and all future ones
+                    </button>
+                    <button onClick={() => removeBlock(selected.data.id, 'all')} disabled={busy}
+                      style={{ width:'100%', padding:'9px', background:'#FEE2E2', color:'#B91C1C', border:'none', borderRadius:'10px', fontSize:'12px', fontWeight:'700', cursor:'pointer' }}>
+                      All in the series
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={() => { if (confirm('Remove this blocked time?')) removeBlock(selected.data.id, 'one') }} disabled={busy}
+                    style={{ width:'100%', padding:'9px', background:'#FEE2E2', color:'#B91C1C', border:'none', borderRadius:'10px', fontSize:'12px', fontWeight:'700', cursor:'pointer' }}>
+                    Remove block (become available)
+                  </button>
+                )}
               </>
             ) : (
               <>

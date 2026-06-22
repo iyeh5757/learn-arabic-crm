@@ -3,6 +3,7 @@
 // can block on a teacher's behalf via teacher_id. Supports bulk (recurring).
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import crypto from 'crypto'
 
 export const runtime = 'nodejs'
 
@@ -26,7 +27,7 @@ export async function GET(req: Request) {
     if (teacherIdsForSupervisor.length === 0) return NextResponse.json([])
   }
 
-  let q = supabase.from('calendar_blocks').select('id, teacher_id, start_at, end_at, reason')
+  let q = supabase.from('calendar_blocks').select('id, teacher_id, start_at, end_at, reason, recurrence_group_id')
   if (teacherId)               q = q.eq('teacher_id', teacherId)
   if (teacherIdsForSupervisor) q = q.in('teacher_id', teacherIdsForSupervisor)
   if (start) q = q.gte('start_at', start)
@@ -62,8 +63,13 @@ export async function POST(req: Request) {
 
   if (list.length === 0) return NextResponse.json({ error: 'No block times provided' }, { status: 400 })
 
+  // Recurring (>1 occurrence) blocks share a recurrence group so they can be
+  // edited/removed together later (this / this & future / all).
+  const groupId = list.length > 1 ? crypto.randomUUID() : null
+
   const rows = list.map(b => ({
-    teacher_id: tId, start_at: b.start_at, end_at: b.end_at, reason: reason ?? null, created_by: user.id,
+    teacher_id: tId, start_at: b.start_at, end_at: b.end_at, reason: reason ?? null,
+    recurrence_group_id: groupId, created_by: user.id,
   }))
 
   const { data, error } = await supabase.from('calendar_blocks').insert(rows).select()

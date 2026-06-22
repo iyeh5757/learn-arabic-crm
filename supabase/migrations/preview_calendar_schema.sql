@@ -99,14 +99,15 @@ create table if not exists teacher_availability (
 
 -- 5. Ad-hoc blocked time slots
 create table if not exists calendar_blocks (
-  id              uuid primary key default gen_random_uuid(),
-  teacher_id      uuid references teachers(id) on delete cascade,
-  start_at        timestamptz not null,
-  end_at          timestamptz not null,
-  reason          text,
-  google_event_id text,
-  created_by      uuid references profiles(id),
-  created_at      timestamptz default now()
+  id                  uuid primary key default gen_random_uuid(),
+  teacher_id          uuid references teachers(id) on delete cascade,
+  start_at            timestamptz not null,
+  end_at              timestamptz not null,
+  reason              text,
+  recurrence_group_id uuid,            -- groups blocks created as one recurring series
+  google_event_id     text,
+  created_by          uuid references profiles(id),
+  created_at          timestamptz default now()
 );
 
 -- 6. Per-user Google OAuth tokens

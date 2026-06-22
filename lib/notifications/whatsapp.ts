@@ -58,6 +58,13 @@ function buildReminderText(data: SessionReminderData): string {
   if (data.meetLink) {
     lines.push(``, `🎥 *Join here:* ${data.meetLink}`)
   }
+  // Reschedule notice only on the earlier reminders (not the 1-hour one)
+  if (data.hoursBeforeLabel === '24 hours' || data.hoursBeforeLabel === '12 hours') {
+    lines.push(
+      ``,
+      `📌 Need to reschedule? Please reach out to your supervisor in your group so they can help. Reschedule requests must be made *at least 12 hours in advance* — otherwise the class will be counted.`
+    )
+  }
   lines.push(``, `_Learn Arabic Academy — automated reminder_`)
   return lines.join('\n')
 }
