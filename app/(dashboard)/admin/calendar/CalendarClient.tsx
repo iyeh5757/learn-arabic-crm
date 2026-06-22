@@ -35,6 +35,29 @@ const EMPTY_FORM = {
   force: false, force_reason: '',
 }
 
+// Offset (minutes) of a timezone at a given instant, via Intl — DST-safe.
+function tzOffsetMinutes(timeZone: string, date: Date): number {
+  const dtf = new Intl.DateTimeFormat('en-US', {
+    timeZone, hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  })
+  const map: Record<string, string> = {}
+  for (const p of dtf.formatToParts(date)) map[p.type] = p.value
+  const asUTC = Date.UTC(+map.year, +map.month - 1, +map.day, +map.hour, +map.minute, +map.second)
+  return (asUTC - date.getTime()) / 60000
+}
+
+// Convert a Cairo wall-clock date+time into the correct UTC instant,
+// independent of the admin's browser timezone.
+function cairoToUtc(dateStr: string, timeStr: string): Date {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const [hh, mm]  = timeStr.split(':').map(Number)
+  const guess = new Date(Date.UTC(y, m - 1, d, hh, mm))
+  const offset = tzOffsetMinutes('Africa/Cairo', guess)
+  return new Date(guess.getTime() - offset * 60000)
+}
+
 export default function CalendarClient({ sessionTypes, teachers, students }: Props) {
   const calRef = useRef<any>(null)
   const [form, setForm]     = useState({ ...EMPTY_FORM })
@@ -91,7 +114,7 @@ export default function CalendarClient({ sessionTypes, teachers, students }: Pro
 
   async function handleSubmit(force = false) {
     setSaving(true); setError('')
-    const start = new Date(`${form.date}T${form.start_time}:00`)
+    const start = cairoToUtc(form.date, form.start_time)
     const end   = new Date(start.getTime() + form.duration_minutes * 60000)
 
     const payload = {
@@ -129,7 +152,10 @@ export default function CalendarClient({ sessionTypes, teachers, students }: Pro
       })
     }
 
-    refresh(); setModal(false); setSaving(false)
+    // Jump the calendar to the new session's date and refresh so it's always visible
+    const api = calRef.current?.getApi()
+    if (api) { api.gotoDate(start); api.refetchEvents() }
+    setModal(false); setSaving(false)
   }
 
   async function cancelSession() {
