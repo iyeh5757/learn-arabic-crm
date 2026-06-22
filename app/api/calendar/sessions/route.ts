@@ -2,18 +2,28 @@
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { createCalendarEventWithMeet, isGoogleConfigured } from '@/lib/calendar/google'
+import { remindSessionIfDue } from '@/lib/calendar/reminders'
 
 export const runtime = 'nodejs'
 
-// GET /api/calendar/sessions?teacher_id=&start=&end=&status=
+// GET /api/calendar/sessions?teacher_id=&supervisor_id=&start=&end=&status=
 export async function GET(req: Request) {
   const supabase = createClient()
   const { searchParams } = new URL(req.url)
 
-  const teacherId = searchParams.get('teacher_id')
-  const start     = searchParams.get('start')
-  const end       = searchParams.get('end')
-  const status    = searchParams.get('status')
+  const teacherId    = searchParams.get('teacher_id')
+  const supervisorId = searchParams.get('supervisor_id')
+  const start        = searchParams.get('start')
+  const end          = searchParams.get('end')
+  const status       = searchParams.get('status')
+
+  // Supervisor filter → expand to all teachers assigned to that supervisor
+  let teacherIdsForSupervisor: string[] | null = null
+  if (supervisorId) {
+    const { data: ts } = await supabase.from('teachers').select('id').eq('supervisor_id', supervisorId)
+    teacherIdsForSupervisor = (ts ?? []).map((t: any) => t.id)
+    if (teacherIdsForSupervisor.length === 0) return NextResponse.json([])
+  }
 
   let query = supabase
     .from('calendar_sessions')
@@ -27,10 +37,11 @@ export async function GET(req: Request) {
     `)
     .order('start_at')
 
-  if (teacherId) query = query.eq('teacher_id', teacherId)
-  if (start)     query = query.gte('start_at', start)
-  if (end)       query = query.lte('start_at', end)
-  if (status)    query = query.eq('status', status)
+  if (teacherId)               query = query.eq('teacher_id', teacherId)
+  if (teacherIdsForSupervisor) query = query.in('teacher_id', teacherIdsForSupervisor)
+  if (start)                   query = query.gte('start_at', start)
+  if (end)                     query = query.lte('start_at', end)
+  if (status)                  query = query.eq('status', status)
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
@@ -127,6 +138,9 @@ export async function POST(req: Request) {
     new_data:     data,
     source:       'crm',
   })
+
+  // If booked within a reminder window (e.g. less than an hour out), fire it now
+  await remindSessionIfDue(supabase, data.id)
 
   return NextResponse.json(data, { status: 201 })
 }

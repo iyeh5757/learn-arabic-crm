@@ -17,12 +17,14 @@ const label: React.CSSProperties = {
 }
 
 type SessionType = { id: string; name: string; color: string }
-type Teacher = { id: string; name: string }
+type Teacher = { id: string; name: string; supervisor_id?: string | null }
+type Supervisor = { id: string; name: string }
 type Student = { id: string; name: string; email: string; phone: string }
 
 interface Props {
   sessionTypes: SessionType[]
   teachers: Teacher[]
+  supervisors: Supervisor[]
   students: Student[]
 }
 
@@ -58,8 +60,10 @@ function cairoToUtc(dateStr: string, timeStr: string): Date {
   return new Date(guess.getTime() - offset * 60000)
 }
 
-export default function CalendarClient({ sessionTypes, teachers, students }: Props) {
+export default function CalendarClient({ sessionTypes, teachers, supervisors, students }: Props) {
   const calRef = useRef<any>(null)
+  const [filterTeacher, setFilterTeacher]       = useState('')
+  const [filterSupervisor, setFilterSupervisor] = useState('')
   const [form, setForm]     = useState({ ...EMPTY_FORM })
   const [modal, setModal]   = useState(false)
   const [conflict, setConflict] = useState(false)
@@ -71,11 +75,16 @@ export default function CalendarClient({ sessionTypes, teachers, students }: Pro
   const [studentQuery, setStudentQuery] = useState('')
   const [showStudentList, setShowStudentList] = useState(false)
   const [loadError, setLoadError] = useState('')
+  const filterTeacherRef    = useRef('')
+  const filterSupervisorRef = useRef('')
   const supabase = createClient()
 
   const loadEvents = useCallback(async (fetchInfo: any, successCb: any, failureCb: any) => {
     try {
-      const qs = new URLSearchParams({ start: fetchInfo.startStr, end: fetchInfo.endStr }).toString()
+      const params: Record<string, string> = { start: fetchInfo.startStr, end: fetchInfo.endStr }
+      if (filterTeacherRef.current)    params.teacher_id    = filterTeacherRef.current
+      if (filterSupervisorRef.current) params.supervisor_id = filterSupervisorRef.current
+      const qs = new URLSearchParams(params).toString()
       const res = await fetch(`/api/calendar/sessions?${qs}`)
       const data = await res.json()
       if (!res.ok) {
@@ -84,9 +93,12 @@ export default function CalendarClient({ sessionTypes, teachers, students }: Pro
       }
       setLoadError('')
       const arr = Array.isArray(data) ? data : []
+      const showTeacher = !filterTeacherRef.current  // include teacher name unless viewing one teacher
       successCb(arr.map((s: any) => ({
         id:    s.id,
-        title: `${s.student_name ?? 'Session'} · ${s.session_type?.name ?? ''}`,
+        title: showTeacher
+          ? `${s.teacher?.profile?.name ?? '—'} · ${s.student_name ?? 'Session'}`
+          : `${s.student_name ?? 'Session'} · ${s.session_type?.name ?? ''}`,
         start: s.start_at,
         end:   s.end_at,
         backgroundColor: s.status === 'cancelled' ? '#E2E8F0' : (s.session_type?.color ?? '#64748B'),
@@ -101,6 +113,22 @@ export default function CalendarClient({ sessionTypes, teachers, students }: Pro
   }, [])
 
   function refresh() { calRef.current?.getApi()?.refetchEvents() }
+
+  function onTeacherFilter(id: string) {
+    setFilterTeacher(id); setFilterSupervisor('')
+    filterTeacherRef.current = id; filterSupervisorRef.current = ''
+    refresh()
+  }
+  function onSupervisorFilter(id: string) {
+    setFilterSupervisor(id); setFilterTeacher('')
+    filterSupervisorRef.current = id; filterTeacherRef.current = ''
+    refresh()
+  }
+  function clearFilters() {
+    setFilterTeacher(''); setFilterSupervisor('')
+    filterTeacherRef.current = ''; filterSupervisorRef.current = ''
+    refresh()
+  }
 
   function openNew(dateStr?: string, timeStr?: string) {
     setForm({ ...EMPTY_FORM, date: dateStr ?? '', start_time: timeStr ?? '' })
@@ -250,6 +278,33 @@ export default function CalendarClient({ sessionTypes, teachers, students }: Pro
           ⚠️ Could not load sessions: {loadError}
         </div>
       )}
+
+      {/* Filter bar */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginBottom: '12px', background: '#fff', border: '1px solid #F1F5F9', borderRadius: '12px', padding: '12px 16px' }}>
+        <span style={{ fontSize: '12px', fontWeight: '700', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Filter</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ fontSize: '12px', color: '#94A3B8' }}>👩‍🏫 Teacher</span>
+          <select value={filterTeacher} onChange={e => onTeacherFilter(e.target.value)}
+            style={{ padding: '7px 10px', border: '1px solid #E2E8F0', borderRadius: '9px', fontSize: '13px', outline: 'none', background: filterTeacher ? '#0D1B2A' : '#fff', color: filterTeacher ? '#E8C97A' : '#334155', fontWeight: filterTeacher ? 700 : 400 }}>
+            <option value="">All teachers</option>
+            {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ fontSize: '12px', color: '#94A3B8' }}>🔍 Supervisor</span>
+          <select value={filterSupervisor} onChange={e => onSupervisorFilter(e.target.value)}
+            style={{ padding: '7px 10px', border: '1px solid #E2E8F0', borderRadius: '9px', fontSize: '13px', outline: 'none', background: filterSupervisor ? '#0D1B2A' : '#fff', color: filterSupervisor ? '#E8C97A' : '#334155', fontWeight: filterSupervisor ? 700 : 400 }}>
+            <option value="">All supervisors</option>
+            {supervisors.map(s => <option key={s.id} value={s.id}>{s.name}'s teachers</option>)}
+          </select>
+        </div>
+        {(filterTeacher || filterSupervisor) && (
+          <button onClick={clearFilters}
+            style={{ padding: '6px 12px', background: '#F1F5F9', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', color: '#475569' }}>
+            ✕ Clear
+          </button>
+        )}
+      </div>
 
       <div style={{ background: '#fff', borderRadius: '18px', padding: '18px 20px', boxShadow: '0 1px 3px rgba(15,23,42,0.06), 0 1px 2px rgba(15,23,42,0.04)', border: '1px solid #F1F5F9' }}>
         <FullCalendar

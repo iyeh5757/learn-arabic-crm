@@ -19,16 +19,21 @@ export default async function CalendarPage() {
     { data: sessionTypes },
     { data: teacherRows },
     { data: students },
+    { data: supervisorRows },
   ] = await Promise.all([
     supabase.from('session_type_config').select('id, name, color').eq('is_active', true).order('sort_order'),
-    supabase.from('teachers').select('id, profile:profiles!teachers_user_id_fkey(name)').order('id'),
+    supabase.from('teachers').select('id, supervisor_id, profile:profiles!teachers_user_id_fkey(name)').order('id'),
     supabase.from('students').select('id, name, email, phone').in('student_status', ['active', 'trial']).order('name'),
+    supabase.from('profiles').select('id, name').eq('role', 'supervisor').order('name'),
   ])
 
   const teachers = (teacherRows ?? []).map((t: any) => ({
-    id:   t.id,
-    name: t.profile?.name ?? 'Unknown',
+    id:            t.id,
+    name:          t.profile?.name ?? 'Unknown',
+    supervisor_id: t.supervisor_id ?? null,
   }))
+
+  const supervisors = (supervisorRows ?? []).map((s: any) => ({ id: s.id, name: s.name }))
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -75,6 +80,7 @@ export default async function CalendarPage() {
       <CalendarClient
         sessionTypes={sessionTypes ?? []}
         teachers={teachers}
+        supervisors={supervisors}
         students={(students ?? []).map((s: any) => ({ id: s.id, name: s.name, email: s.email ?? '', phone: s.phone ?? '' }))}
       />
     </div>
