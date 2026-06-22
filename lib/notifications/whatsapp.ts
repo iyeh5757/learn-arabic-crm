@@ -12,7 +12,14 @@ function clean(v?: string): string {
   return (v ?? '').replace(/[^\x20-\x7E]/g, '').trim()
 }
 
-const API_URL  = clean(process.env.EVOLUTION_API_URL).replace(/\/+$/, '')
+// Ensure the URL has a scheme — fetch() requires https:// or http://
+function withScheme(url: string): string {
+  if (!url) return ''
+  if (/^https?:\/\//i.test(url)) return url
+  return 'https://' + url
+}
+
+const API_URL  = withScheme(clean(process.env.EVOLUTION_API_URL)).replace(/\/+$/, '')
 const API_KEY  = clean(process.env.EVOLUTION_API_KEY)
 const INSTANCE = clean(process.env.EVOLUTION_INSTANCE)
 
