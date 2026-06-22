@@ -70,13 +70,21 @@ export default function CalendarClient({ sessionTypes, teachers, students }: Pro
   const [copied, setCopied] = useState(false)
   const [studentQuery, setStudentQuery] = useState('')
   const [showStudentList, setShowStudentList] = useState(false)
+  const [loadError, setLoadError] = useState('')
   const supabase = createClient()
 
   const loadEvents = useCallback(async (fetchInfo: any, successCb: any, failureCb: any) => {
     try {
-      const res = await fetch(`/api/calendar/sessions?start=${fetchInfo.startStr}&end=${fetchInfo.endStr}`)
+      const qs = new URLSearchParams({ start: fetchInfo.startStr, end: fetchInfo.endStr }).toString()
+      const res = await fetch(`/api/calendar/sessions?${qs}`)
       const data = await res.json()
-      successCb((data ?? []).map((s: any) => ({
+      if (!res.ok) {
+        setLoadError(data?.error ?? `Failed to load sessions (HTTP ${res.status})`)
+        successCb([]); return
+      }
+      setLoadError('')
+      const arr = Array.isArray(data) ? data : []
+      successCb(arr.map((s: any) => ({
         id:    s.id,
         title: `${s.student_name ?? 'Session'} · ${s.session_type?.name ?? ''}`,
         start: s.start_at,
@@ -86,7 +94,10 @@ export default function CalendarClient({ sessionTypes, teachers, students }: Pro
         textColor:       s.status === 'cancelled' ? '#94A3B8' : '#fff',
         extendedProps:   s,
       })))
-    } catch (e) { failureCb(e) }
+    } catch (e: any) {
+      setLoadError(e?.message ?? 'Network error loading sessions')
+      failureCb(e)
+    }
   }, [])
 
   function refresh() { calRef.current?.getApi()?.refetchEvents() }
@@ -233,6 +244,12 @@ export default function CalendarClient({ sessionTypes, teachers, students }: Pro
         .fc .fc-list-event:hover td { background: #F8FAFC; }
         .fc .fc-list-event-dot { border-radius: 3px; }
       `}</style>
+
+      {loadError && (
+        <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '12px', padding: '12px 16px', marginBottom: '12px', color: '#B91C1C', fontSize: '13px', fontWeight: '600' }}>
+          ⚠️ Could not load sessions: {loadError}
+        </div>
+      )}
 
       <div style={{ background: '#fff', borderRadius: '18px', padding: '18px 20px', boxShadow: '0 1px 3px rgba(15,23,42,0.06), 0 1px 2px rgba(15,23,42,0.04)', border: '1px solid #F1F5F9' }}>
         <FullCalendar
