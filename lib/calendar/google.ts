@@ -130,6 +130,95 @@ export async function createCalendarEventWithMeet(
   return { eventId: json.id, meetLink, htmlLink: json.htmlLink ?? null }
 }
 
+// Creates a Meet space directly via the Meet API (so we own it and can set
+// access type, auto-recording, and co-hosts). Recording is patched separately
+// so an unsupported plan doesn't block space creation.
+export async function createMeetSpace(
+  opts: { openAccess?: boolean; autoRecord?: boolean }
+): Promise<{ meetUri: string; spaceName: string; recordingApplied: boolean }> {
+  const token = await getAccessToken(SCOPE_MEET)
+  const res = await fetch('https://meet.googleapis.com/v2/spaces', {
+    method:  'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body:    JSON.stringify({ config: { accessType: opts.openAccess ? 'OPEN' : 'TRUSTED' } }),
+  })
+  const space = await res.json()
+  if (!res.ok) throw new Error(space?.error?.message ?? 'Meet space create failed')
+
+  const meetUri   = space.meetingUri
+  const spaceName = space.name   // "spaces/xxxx"
+
+  let recordingApplied = false
+  if (opts.autoRecord) {
+    try {
+      const pr = await fetch(
+        `https://meet.googleapis.com/v2/${spaceName}?updateMask=config.artifactConfig.recordingConfig.autoRecordingGeneration`,
+        {
+          method:  'PATCH',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ config: { artifactConfig: { recordingConfig: { autoRecordingGeneration: 'ON' } } } }),
+        }
+      )
+      recordingApplied = pr.ok
+      if (!pr.ok) console.error('[Meet] auto-record patch failed:', (await pr.json().catch(() => ({})))?.error?.message)
+    } catch (e: any) { console.error('[Meet] auto-record error:', e?.message) }
+  }
+
+  return { meetUri, spaceName, recordingApplied }
+}
+
+// Adds co-hosts to a Meet space (best-effort; co-hosts usually must be in the org).
+export async function addMeetCoHosts(
+  spaceName: string, emails: string[]
+): Promise<{ added: string[]; error?: string }> {
+  const out: { added: string[]; error?: string } = { added: [] }
+  if (!spaceName || emails.length === 0) return out
+  let token: string
+  try { token = await getAccessToken(SCOPE_MEET) }
+  catch (e: any) { out.error = e?.message; return out }
+
+  for (const email of emails) {
+    try {
+      const r = await fetch(`https://meet.googleapis.com/v2/${spaceName}/members`, {
+        method:  'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ email, role: 'COHOST' }),
+      })
+      if (r.ok) out.added.push(email)
+      else if (!out.error) out.error = (await r.json().catch(() => ({})))?.error?.message ?? `member ${r.status}`
+    } catch (e: any) { if (!out.error) out.error = e?.message }
+  }
+  return out
+}
+
+// Creates a calendar event that points at an already-created Meet link
+// (used when the Meet was made via the Meet API). The link is in the location
+// and description so attendees get it in their invite.
+export async function createCalendarEventWithLink(
+  input: CreateEventInput, meetLink: string
+): Promise<CreatedEvent | null> {
+  if (!isGoogleConfigured()) return null
+  const token = await getAccessToken()
+  const description = `${input.description ? input.description + '\n\n' : ''}Join Google Meet:\n${meetLink}`
+  const body = {
+    summary:     input.summary,
+    description,
+    location:    meetLink,
+    start: { dateTime: input.startIso, timeZone: input.timezone },
+    end:   { dateTime: input.endIso,   timeZone: input.timezone },
+    attendees: input.attendees.filter(Boolean).map(email => ({ email })),
+  }
+  const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CALENDAR_ID)}/events?sendUpdates=all`
+  const res = await fetch(url, {
+    method:  'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body:    JSON.stringify(body),
+  })
+  const json = await res.json()
+  if (!res.ok) throw new Error(json.error?.message ?? 'Google Calendar create failed')
+  return { eventId: json.id, meetLink, htmlLink: json.htmlLink ?? null }
+}
+
 export interface FetchedEvent {
   exists:    boolean
   cancelled: boolean

@@ -37,6 +37,7 @@ const EMPTY_FORM = {
   days: [] as number[],
   force: false, force_reason: '',
   open_access: true, auto_record: false,
+  teacher_cohost: true, cohost_email: '',
 }
 
 // Offset (minutes) of a timezone at a given instant, via Intl — DST-safe.
@@ -174,6 +175,8 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
       force_booked_reason: force ? form.force_reason : null,
       open_access:      form.open_access,
       auto_record:      form.auto_record,
+      teacher_cohost:   form.teacher_cohost,
+      cohost_email:     form.cohost_email.trim() || null,
     }
 
     const res = await fetch('/api/calendar/sessions', {
@@ -618,6 +621,20 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
                     <div style={{ fontSize: '13px', fontWeight: '600', color: '#334155' }}>Auto-record</div>
                     <div style={{ fontSize: '11px', color: '#94A3B8' }}>Recording saves to the organizer's Google Drive</div>
                   </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <button type="button" onClick={() => setForm(f => ({ ...f, teacher_cohost: !f.teacher_cohost }))}
+                    style={{ width: '42px', height: '24px', borderRadius: '12px', background: form.teacher_cohost ? '#0D1B2A' : '#CBD5E1', border: 'none', cursor: 'pointer', position: 'relative', flexShrink: 0, transition: 'background 0.2s' }}>
+                    <span style={{ position: 'absolute', width: '18px', height: '18px', borderRadius: '50%', background: '#fff', top: '3px', left: form.teacher_cohost ? '21px' : '3px', transition: 'left 0.2s' }} />
+                  </button>
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: '600', color: '#334155' }}>Make teacher a co-host</div>
+                    <div style={{ fontSize: '11px', color: '#94A3B8' }}>Lets the teacher admit guests and control the call</div>
+                  </div>
+                </div>
+                <div>
+                  <label style={{ fontSize: '12px', color: '#64748B', fontWeight: 600, display: 'block', marginBottom: '4px' }}>Additional co-host email (optional)</label>
+                  <input style={inp} type="email" placeholder="cohost@example.com" value={form.cohost_email} onChange={e => setForm(f => ({ ...f, cohost_email: e.target.value }))} />
                 </div>
               </div>
 

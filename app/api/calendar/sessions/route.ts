@@ -1,7 +1,7 @@
 // app/api/calendar/sessions/route.ts
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { createCalendarEventWithMeet, configureMeetSpace, isGoogleConfigured } from '@/lib/calendar/google'
+import { createCalendarEventWithMeet, createMeetSpace, addMeetCoHosts, createCalendarEventWithLink, isGoogleConfigured } from '@/lib/calendar/google'
 import { remindSessionIfDue } from '@/lib/calendar/reminders'
 
 export const runtime = 'nodejs'
@@ -60,7 +60,7 @@ export async function POST(req: Request) {
     student_email, student_phone, start_at, end_at,
     duration_minutes, notes, sales_notes, supervisor_notes,
     recurring_rule_id, force_booked, force_booked_reason,
-    open_access, auto_record,
+    open_access, auto_record, teacher_cohost, cohost_email,
   } = body
 
   if (!teacher_id || !start_at || !end_at || !duration_minutes) {
@@ -95,21 +95,41 @@ export async function POST(req: Request) {
       const teacherEmail = (teacherRow as any)?.profile?.email ?? ''
       const teacherName  = (teacherRow as any)?.profile?.name ?? 'Teacher'
       const typeName     = (typeRow as any)?.name ?? 'Arabic'
-
-      const ev = await createCalendarEventWithMeet({
+      const eventInput = {
         summary:     `${typeName} — ${student_name ?? 'Student'} with ${teacherName}`,
         description: notes ?? '',
         startIso:    start_at,
         endIso:      end_at,
         timezone:    'Africa/Cairo',
         attendees:   [student_email, teacherEmail].filter(Boolean),
-      })
-      if (ev) { googleEventId = ev.eventId; googleMeetLink = ev.meetLink }
+      }
 
-      // Apply Open-access / Auto-record settings to the Meet (best-effort)
-      if (googleMeetLink && (open_access || auto_record)) {
-        const res = await configureMeetSpace(googleMeetLink, { openAccess: !!open_access, autoRecord: !!auto_record })
-        console.log('[Calendar] Meet settings applied:', res)
+      // Create the Meet through the Meet API so we control its settings,
+      // then attach it to a calendar invite. Fall back to a normal Calendar
+      // Meet if the Meet API isn't available.
+      let madeViaMeetApi = false
+      try {
+        const space = await createMeetSpace({ openAccess: !!open_access, autoRecord: !!auto_record })
+        if (space?.meetUri) {
+          // Co-hosts (best-effort)
+          const cohosts: string[] = []
+          if (teacher_cohost && teacherEmail) cohosts.push(teacherEmail)
+          if (cohost_email) cohosts.push(String(cohost_email).trim())
+          if (cohosts.length) {
+            const r = await addMeetCoHosts(space.spaceName, cohosts)
+            console.log('[Meet] co-hosts:', r)
+          }
+          const ev = await createCalendarEventWithLink(eventInput, space.meetUri)
+          if (ev) { googleEventId = ev.eventId; googleMeetLink = space.meetUri; madeViaMeetApi = true }
+          console.log('[Meet] space created:', { openAccess: !!open_access, autoRecord: space.recordingApplied })
+        }
+      } catch (e: any) {
+        console.error('[Meet] space flow failed, falling back to Calendar Meet:', e?.message)
+      }
+
+      if (!madeViaMeetApi) {
+        const ev = await createCalendarEventWithMeet(eventInput)
+        if (ev) { googleEventId = ev.eventId; googleMeetLink = ev.meetLink }
       }
     } catch (e: any) {
       console.error('[Calendar] Google event creation failed:', e?.message)
