@@ -193,27 +193,48 @@ export async function addMeetCoHosts(
 }
 
 // Creates a calendar event that points at an already-created Meet link
-// (used when the Meet was made via the Meet API). The link is in the location
-// and description so attendees get it in their invite.
+// (made via the Meet API). First tries to attach it as a real conference so the
+// native "Join with Google Meet" button shows; falls back to a description link.
 export async function createCalendarEventWithLink(
   input: CreateEventInput, meetLink: string
 ): Promise<CreatedEvent | null> {
   if (!isGoogleConfigured()) return null
   const token = await getAccessToken()
+  const code = meetLink.split('/').filter(Boolean).pop() ?? ''
   const description = `${input.description ? input.description + '\n\n' : ''}🎥 Join Google Meet: ${meetLink}`
-  const body = {
+  const base: any = {
     summary:     input.summary,
     description,
     start: { dateTime: input.startIso, timeZone: input.timezone },
     end:   { dateTime: input.endIso,   timeZone: input.timezone },
     attendees: input.attendees.filter(Boolean).map(email => ({ email })),
   }
-  const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CALENDAR_ID)}/events?sendUpdates=all`
-  const res = await fetch(url, {
+  const calBase = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CALENDAR_ID)}/events`
+
+  // Attempt 1: attach as a native conference (shows the Join button)
+  const withConf = {
+    ...base,
+    conferenceData: {
+      conferenceId: code,
+      conferenceSolution: { key: { type: 'hangoutsMeet' }, name: 'Google Meet' },
+      entryPoints: [{ entryPointType: 'video', uri: meetLink, label: code }],
+    },
+  }
+  let res = await fetch(`${calBase}?conferenceDataVersion=1&sendUpdates=all`, {
     method:  'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body:    JSON.stringify(body),
+    body:    JSON.stringify(withConf),
   })
+
+  // Attempt 2 (fallback): plain event, link in description only
+  if (!res.ok) {
+    res = await fetch(`${calBase}?sendUpdates=all`, {
+      method:  'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body:    JSON.stringify(base),
+    })
+  }
+
   const json = await res.json()
   if (!res.ok) throw new Error(json.error?.message ?? 'Google Calendar create failed')
   return { eventId: json.id, meetLink, htmlLink: json.htmlLink ?? null }
