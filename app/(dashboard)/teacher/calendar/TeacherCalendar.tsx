@@ -7,10 +7,32 @@ import interactionPlugin from '@fullcalendar/interaction'
 import luxon3Plugin from '@fullcalendar/luxon3'
 import { useCallback, useRef, useState } from 'react'
 
+function tzOffsetMinutes(timeZone: string, date: Date): number {
+  const dtf = new Intl.DateTimeFormat('en-US', { timeZone, hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  const m: Record<string, string> = {}
+  for (const p of dtf.formatToParts(date)) m[p.type] = p.value
+  const asUTC = Date.UTC(+m.year, +m.month - 1, +m.day, +m.hour, +m.minute, +m.second)
+  return (asUTC - date.getTime()) / 60000
+}
+// Cairo wall-clock (date + HH:mm) → correct UTC Date
+function cairoToUtc(dateStr: string, timeStr: string): Date {
+  const [y, mo, d] = dateStr.split('-').map(Number)
+  const [hh, mm] = timeStr.split(':').map(Number)
+  const guess = new Date(Date.UTC(y, mo - 1, d, hh, mm))
+  return new Date(guess.getTime() - tzOffsetMinutes('Africa/Cairo', guess) * 60000)
+}
+
+const inp: React.CSSProperties = { padding: '9px 11px', border: '1px solid #E2E8F0', borderRadius: '10px', fontSize: '13px', width: '100%', outline: 'none', background: '#fff' }
+const lbl: React.CSSProperties = { fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '5px', display: 'block' }
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+const EMPTY_BLOCK = { date: '', start_time: '', end_time: '', reason: '', recurring: false, days: [] as number[], weeks: 8 }
+
 export default function TeacherCalendar() {
   const calRef = useRef<any>(null)
   const [selected, setSelected] = useState<any>(null)
   const [busy, setBusy] = useState(false)
+  const [blockForm, setBlockForm] = useState<typeof EMPTY_BLOCK | null>(null)
 
   const loadEvents = useCallback(async (info: any, success: any, failure: any) => {
     try {
@@ -43,16 +65,60 @@ export default function TeacherCalendar() {
 
   function refresh() { calRef.current?.getApi()?.refetchEvents() }
 
-  async function blockRange(info: any) {
-    const label = new Date(info.start).toLocaleString('en-GB', { timeZone: 'Africa/Cairo', weekday: 'short', hour: '2-digit', minute: '2-digit' })
-    if (!confirm(`Block this time as unavailable?\n${label}`)) { calRef.current?.getApi()?.unselect(); return }
+  function cairoParts(d: Date) {
+    const p = new Intl.DateTimeFormat('en-CA', { timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(d)
+    const m: Record<string, string> = {}
+    for (const x of p) m[x.type] = x.value
+    return { date: `${m.year}-${m.month}-${m.day}`, time: `${m.hour === '24' ? '00' : m.hour}:${m.minute}` }
+  }
+
+  // Drag-select opens the block modal pre-filled with the chosen range
+  function onSelect(info: any) {
+    const s = cairoParts(new Date(info.start))
+    const e = cairoParts(new Date(info.end))
+    setBlockForm({ ...EMPTY_BLOCK, date: s.date, start_time: s.time, end_time: e.time })
+    calRef.current?.getApi()?.unselect()
+  }
+
+  function openBlock() {
+    const today = cairoParts(new Date())
+    setBlockForm({ ...EMPTY_BLOCK, date: today.date, start_time: '09:00', end_time: '10:00' })
+  }
+
+  function toggleDay(d: number) {
+    setBlockForm(f => f && ({ ...f, days: f.days.includes(d) ? f.days.filter(x => x !== d) : [...f.days, d] }))
+  }
+
+  async function saveBlock() {
+    if (!blockForm) return
+    const { date, start_time, end_time, recurring, days, weeks, reason } = blockForm
+    if (!date || !start_time || !end_time) { alert('Pick a date, start time and end time.'); return }
+    if (cairoToUtc(date, end_time) <= cairoToUtc(date, start_time)) { alert('End time must be after start time.'); return }
+
+    const blocks: Array<{ start_at: string; end_at: string }> = []
+    if (!recurring) {
+      blocks.push({ start_at: cairoToUtc(date, start_time).toISOString(), end_at: cairoToUtc(date, end_time).toISOString() })
+    } else {
+      if (days.length === 0) { alert('Pick at least one weekday to repeat on.'); return }
+      const [by, bm, bd] = date.split('-').map(Number)
+      for (let n = 0; n < weeks * 7; n++) {
+        const day = new Date(by, bm - 1, bd + n)
+        if (!days.includes(day.getDay())) continue
+        const ds = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`
+        const start = cairoToUtc(ds, start_time)
+        if (start.getTime() < Date.now()) continue
+        blocks.push({ start_at: start.toISOString(), end_at: cairoToUtc(ds, end_time).toISOString() })
+      }
+    }
+    if (blocks.length === 0) { alert('No upcoming times to block (all selected dates are in the past).'); return }
+
     setBusy(true)
     const res = await fetch('/api/calendar/blocks', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ start_at: new Date(info.start).toISOString(), end_at: new Date(info.end).toISOString() }),
+      body: JSON.stringify({ blocks, reason: reason || null }),
     })
     setBusy(false)
-    if (res.ok) refresh()
+    if (res.ok) { setBlockForm(null); refresh() }
     else { const d = await res.json(); alert(`Couldn't block: ${d?.error ?? 'error'}`) }
   }
 
@@ -106,14 +172,90 @@ export default function TeacherCalendar() {
           allDaySlot={false} nowIndicator selectable selectMirror
           timeZone="Africa/Cairo" height="calc(100vh - 230px)" expandRows
           events={loadEvents}
-          select={blockRange}
+          select={onSelect}
           eventClick={info => setSelected(info.event.extendedProps)}
         />
       </div>
 
-      <div style={{ marginTop:'10px', fontSize:'12px', color:'#94A3B8' }}>
-        💡 Tip: drag across any empty time to mark yourself <strong>unavailable</strong>. Click a grey block to remove it.
+      <div style={{ marginTop:'10px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'10px', flexWrap:'wrap' }}>
+        <span style={{ fontSize:'12px', color:'#94A3B8' }}>
+          💡 Drag across empty time to block it, or use the button. Click a grey block to remove it.
+        </span>
+        <button onClick={openBlock}
+          style={{ padding:'9px 16px', background:'#0D1B2A', color:'#E8C97A', border:'none', borderRadius:'10px', fontSize:'13px', fontWeight:'700', cursor:'pointer' }}>
+          🚫 Block time
+        </button>
       </div>
+
+      {/* Block modal */}
+      {blockForm && (
+        <div style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.45)', backdropFilter:'blur(2px)', zIndex:100, display:'flex', alignItems:'center', justifyContent:'center', padding:'16px' }}
+          onClick={() => setBlockForm(null)}>
+          <div style={{ background:'#fff', borderRadius:'18px', width:'100%', maxWidth:'460px', maxHeight:'92vh', overflowY:'auto', boxShadow:'0 24px 60px rgba(15,23,42,0.3)' }}
+            onClick={e => e.stopPropagation()}>
+            <div style={{ padding:'20px 24px 16px', borderBottom:'1px solid #F1F5F9', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <div style={{ fontSize:'16px', fontWeight:'800', color:'#0F172A' }}>🚫 Block unavailable time</div>
+              <button onClick={() => setBlockForm(null)} style={{ background:'#F1F5F9', border:'none', borderRadius:'8px', width:'30px', height:'30px', fontSize:'16px', cursor:'pointer', color:'#64748B' }}>✕</button>
+            </div>
+            <div style={{ padding:'18px 24px', display:'flex', flexDirection:'column', gap:'14px' }}>
+              <div>
+                <label style={lbl}>Date</label>
+                <input type="date" style={inp} value={blockForm.date} onChange={e => setBlockForm(f => f && ({ ...f, date: e.target.value }))} />
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px' }}>
+                <div>
+                  <label style={lbl}>From</label>
+                  <input type="time" style={inp} value={blockForm.start_time} onChange={e => setBlockForm(f => f && ({ ...f, start_time: e.target.value }))} />
+                </div>
+                <div>
+                  <label style={lbl}>To</label>
+                  <input type="time" style={inp} value={blockForm.end_time} onChange={e => setBlockForm(f => f && ({ ...f, end_time: e.target.value }))} />
+                </div>
+              </div>
+              <div>
+                <label style={lbl}>Reason (optional)</label>
+                <input style={inp} placeholder="e.g. Personal, holiday…" value={blockForm.reason} onChange={e => setBlockForm(f => f && ({ ...f, reason: e.target.value }))} />
+              </div>
+
+              <div style={{ background:'#F8FAFC', borderRadius:'12px', padding:'14px' }}>
+                <div style={{ display:'flex', alignItems:'center', gap:'10px', marginBottom: blockForm.recurring ? '12px' : '0' }}>
+                  <button type="button" onClick={() => setBlockForm(f => f && ({ ...f, recurring: !f.recurring, days: [] }))}
+                    style={{ width:'42px', height:'24px', borderRadius:'12px', background: blockForm.recurring ? '#0D1B2A' : '#CBD5E1', border:'none', cursor:'pointer', position:'relative', flexShrink:0, transition:'background 0.2s' }}>
+                    <span style={{ position:'absolute', width:'18px', height:'18px', borderRadius:'50%', background:'#fff', top:'3px', left: blockForm.recurring ? '21px' : '3px', transition:'left 0.2s' }} />
+                  </button>
+                  <span style={{ fontSize:'13px', fontWeight:'700', color:'#334155' }}>🔁 Repeat weekly</span>
+                </div>
+                {blockForm.recurring && (
+                  <div>
+                    <div style={{ fontSize:'11px', color:'#94A3B8', marginBottom:'8px' }}>Block these days each week at the same time</div>
+                    <div style={{ display:'flex', gap:'6px', flexWrap:'wrap', marginBottom:'10px' }}>
+                      {DAY_LABELS.map((d, i) => (
+                        <button key={i} type="button" onClick={() => toggleDay(i)}
+                          style={{ padding:'6px 11px', borderRadius:'9px', fontSize:'12px', fontWeight:'700', cursor:'pointer', border:'1.5px solid', borderColor: blockForm.days.includes(i) ? '#0D1B2A' : '#E2E8F0', background: blockForm.days.includes(i) ? '#0D1B2A' : '#fff', color: blockForm.days.includes(i) ? '#E8C97A' : '#64748B' }}>
+                          {d}
+                        </button>
+                      ))}
+                    </div>
+                    <label style={{ fontSize:'12px', color:'#475569', display:'flex', alignItems:'center', gap:'8px' }}>
+                      Repeat for
+                      <input type="number" min={1} max={52} value={blockForm.weeks} onChange={e => setBlockForm(f => f && ({ ...f, weeks: Math.max(1, Math.min(52, Number(e.target.value) || 1)) }))}
+                        style={{ width:'64px', padding:'6px 8px', border:'1px solid #E2E8F0', borderRadius:'8px', fontSize:'13px' }} />
+                      weeks
+                    </label>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div style={{ padding:'16px 24px', borderTop:'1px solid #F1F5F9', display:'flex', gap:'8px', justifyContent:'flex-end' }}>
+              <button onClick={() => setBlockForm(null)} style={{ padding:'10px 20px', background:'#fff', border:'1px solid #E2E8F0', borderRadius:'10px', fontSize:'13px', fontWeight:'700', cursor:'pointer', color:'#475569' }}>Cancel</button>
+              <button onClick={saveBlock} disabled={busy}
+                style={{ padding:'10px 22px', background:'#0D1B2A', color:'#E8C97A', border:'none', borderRadius:'10px', fontSize:'13px', fontWeight:'700', cursor:'pointer' }}>
+                {busy ? 'Saving…' : 'Block time'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Detail popup */}
       {selected && (

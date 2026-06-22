@@ -90,7 +90,10 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
       if (filterTeacherRef.current)    params.teacher_id    = filterTeacherRef.current
       if (filterSupervisorRef.current) params.supervisor_id = filterSupervisorRef.current
       const qs = new URLSearchParams(params).toString()
-      const res = await fetch(`/api/calendar/sessions?${qs}`)
+      const [res, bRes] = await Promise.all([
+        fetch(`/api/calendar/sessions?${qs}`),
+        fetch(`/api/calendar/blocks?${qs}`),
+      ])
       const data = await res.json()
       if (!res.ok) {
         setLoadError(data?.error ?? `Failed to load sessions (HTTP ${res.status})`)
@@ -99,8 +102,8 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
       setLoadError('')
       const arr = Array.isArray(data) ? data : []
       const showTeacher = !filterTeacherRef.current  // include teacher name unless viewing one teacher
-      successCb(arr.map((s: any) => ({
-        id:    s.id,
+      const sessionEvents = arr.map((s: any) => ({
+        id:    `session-${s.id}`,
         title: showTeacher
           ? `${s.teacher?.profile?.name ?? '—'} · ${s.student_name ?? 'Session'}`
           : `${s.student_name ?? 'Session'} · ${s.session_type?.name ?? ''}`,
@@ -109,8 +112,27 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
         backgroundColor: s.status === 'cancelled' ? '#E2E8F0' : (s.session_type?.color ?? '#64748B'),
         borderColor:     s.status === 'cancelled' ? '#CBD5E1' : (s.session_type?.color ?? '#64748B'),
         textColor:       s.status === 'cancelled' ? '#94A3B8' : '#fff',
-        extendedProps:   s,
-      })))
+        extendedProps:   { kind: 'session', ...s },
+      }))
+
+      // Blocked (unavailable) time — shown grey so schedulers can see availability
+      let blockEvents: any[] = []
+      const blocks = await bRes.json().catch(() => [])
+      if (bRes.ok && Array.isArray(blocks)) {
+        const teacherName = (id: string) => teachers.find(t => t.id === id)?.name ?? ''
+        blockEvents = blocks.map((b: any) => ({
+          id:    `block-${b.id}`,
+          title: `🚫 Unavailable${showTeacher && teacherName(b.teacher_id) ? ` · ${teacherName(b.teacher_id)}` : ''}${b.reason ? ` (${b.reason})` : ''}`,
+          start: b.start_at,
+          end:   b.end_at,
+          backgroundColor: '#9CA3AF',
+          borderColor:     '#6B7280',
+          textColor:       '#fff',
+          extendedProps:   { kind: 'block', ...b },
+        }))
+      }
+
+      successCb([...sessionEvents, ...blockEvents])
     } catch (e: any) {
       setLoadError(e?.message ?? 'Network error loading sessions')
       failureCb(e)
@@ -379,7 +401,7 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
           editable={false}
           events={loadEvents}
           select={info => openNew(info.startStr.slice(0, 10), info.startStr.slice(11, 16))}
-          eventClick={info => { setCopied(false); setSelected(info.event.extendedProps) }}
+          eventClick={info => { if (info.event.extendedProps.kind === 'block') return; setCopied(false); setSelected(info.event.extendedProps) }}
           height="calc(100vh - 230px)"
           timeZone="Africa/Cairo"
           expandRows
