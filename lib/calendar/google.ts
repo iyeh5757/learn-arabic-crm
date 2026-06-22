@@ -177,9 +177,10 @@ export async function addMeetCoHosts(
   try { token = await getAccessToken(SCOPE_MEET) }
   catch (e: any) { out.error = e?.message; return out }
 
+  // Member management (co-host roles) lives under the v2beta API.
   for (const email of emails) {
     try {
-      const r = await fetch(`https://meet.googleapis.com/v2/${spaceName}/members`, {
+      const r = await fetch(`https://meet.googleapis.com/v2beta/${spaceName}/members`, {
         method:  'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body:    JSON.stringify({ email, role: 'COHOST' }),
