@@ -85,6 +85,7 @@ export async function POST(req: Request) {
   // Generate a Google Calendar event + Meet link (non-fatal if Google isn't set up)
   let googleEventId: string | null = null
   let googleMeetLink: string | null = null
+  const meetDiag: any = {}
   if (isGoogleConfigured()) {
     try {
       // Look up teacher email + session type name for a nicer invite
@@ -117,13 +118,17 @@ export async function POST(req: Request) {
             : []
           if (cohosts.length) {
             const r = await addMeetCoHosts(space.spaceName, cohosts)
+            meetDiag.cohosts = r
             console.log('[Meet] co-hosts:', r)
           }
           const ev = await createCalendarEventWithLink(eventInput, space.meetUri)
           if (ev) { googleEventId = ev.eventId; googleMeetLink = space.meetUri; madeViaMeetApi = true }
+          meetDiag.openAccess = !!open_access
+          meetDiag.autoRecord = space.recordingApplied
           console.log('[Meet] space created:', { openAccess: !!open_access, autoRecord: space.recordingApplied })
         }
       } catch (e: any) {
+        meetDiag.spaceError = e?.message
         console.error('[Meet] space flow failed, falling back to Calendar Meet:', e?.message)
       }
 
@@ -169,5 +174,5 @@ export async function POST(req: Request) {
   // If booked within a reminder window (e.g. less than an hour out), fire it now
   await remindSessionIfDue(supabase, data.id)
 
-  return NextResponse.json(data, { status: 201 })
+  return NextResponse.json({ ...data, _meet: meetDiag }, { status: 201 })
 }

@@ -209,6 +209,12 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
     const api = calRef.current?.getApi()
     if (api) { api.gotoDate(start); api.refetchEvents() }
     setModal(false); setSaving(false)
+
+    // Surface co-host result so we know if Google accepted it
+    const ch = data?._meet?.cohosts
+    if (ch && (ch.error || (ch.added && ch.added.length < (payload.cohost_emails?.length ?? 0)))) {
+      alert(`Co-host result:\n• Added: ${(ch.added ?? []).join(', ') || 'none'}\n• Error: ${ch.error ?? 'none'}`)
+    }
   }
 
   function startReschedule() {
