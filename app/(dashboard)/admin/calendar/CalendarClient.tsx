@@ -4,6 +4,7 @@ import dayGridPlugin from '@fullcalendar/daygrid'
 import timeGridPlugin from '@fullcalendar/timegrid'
 import listPlugin from '@fullcalendar/list'
 import interactionPlugin from '@fullcalendar/interaction'
+import luxon3Plugin from '@fullcalendar/luxon3'
 import { useState, useCallback, useRef, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -75,6 +76,7 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
   const [studentQuery, setStudentQuery] = useState('')
   const [showStudentList, setShowStudentList] = useState(false)
   const [loadError, setLoadError] = useState('')
+  const [resched, setResched] = useState<null | { date: string; time: string; duration: number }>(null)
   const filterTeacherRef    = useRef('')
   const filterSupervisorRef = useRef('')
   const supabase = createClient()
@@ -197,6 +199,47 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
     setModal(false); setSaving(false)
   }
 
+  function startReschedule() {
+    if (!selected) return
+    // pre-fill with the session's current Cairo date/time
+    const d = new Date(selected.start_at)
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hour12: false,
+    }).formatToParts(d)
+    const m: Record<string, string> = {}
+    for (const p of parts) m[p.type] = p.value
+    setResched({
+      date: `${m.year}-${m.month}-${m.day}`,
+      time: `${m.hour === '24' ? '00' : m.hour}:${m.minute}`,
+      duration: selected.duration_minutes,
+    })
+  }
+
+  async function saveReschedule() {
+    if (!selected || !resched) return
+    setBusy(true)
+    const start = cairoToUtc(resched.date, resched.time)
+    const end   = new Date(start.getTime() + resched.duration * 60000)
+    const res = await fetch(`/api/calendar/sessions/${selected.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        start_at: start.toISOString(),
+        end_at:   end.toISOString(),
+        duration_minutes: resched.duration,
+      }),
+    })
+    setBusy(false)
+    if (res.ok) {
+      setResched(null); setSelected(null)
+      const api = calRef.current?.getApi()
+      if (api) { api.gotoDate(start); api.refetchEvents() }
+    } else {
+      const d = await res.json()
+      alert(`Failed to reschedule: ${d?.error ?? 'unknown error'}`)
+    }
+  }
+
   async function cancelSession() {
     if (!selected) return
     if (!confirm('Cancel this session? The student and teacher will be notified and the Meet event removed.')) return
@@ -309,7 +352,7 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
       <div style={{ background: '#fff', borderRadius: '18px', padding: '18px 20px', boxShadow: '0 1px 3px rgba(15,23,42,0.06), 0 1px 2px rgba(15,23,42,0.04)', border: '1px solid #F1F5F9' }}>
         <FullCalendar
           ref={calRef}
-          plugins={[timeGridPlugin, dayGridPlugin, listPlugin, interactionPlugin]}
+          plugins={[timeGridPlugin, dayGridPlugin, listPlugin, interactionPlugin, luxon3Plugin]}
           initialView="timeGridWeek"
           headerToolbar={{ left: 'prev,next today', center: 'title', right: 'timeGridWeek,timeGridDay,dayGridMonth,listWeek' }}
           buttonText={{ today: 'Today', week: 'Week', day: 'Day', month: 'Month', list: 'Agenda' }}
@@ -334,7 +377,7 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
       {/* Event detail popup */}
       {selected && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.4)', backdropFilter: 'blur(2px)', zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
-          onClick={() => setSelected(null)}>
+          onClick={() => { setSelected(null); setResched(null) }}>
           <div style={{ background: '#fff', borderRadius: '18px', width: '100%', maxWidth: '380px', boxShadow: '0 20px 50px rgba(15,23,42,0.25)', borderTop: `5px solid ${selected.session_type?.color ?? '#64748B'}`, overflow: 'hidden' }}
             onClick={e => e.stopPropagation()}>
             <div style={{ padding: '20px 22px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -342,7 +385,7 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
                 <div style={{ fontSize: '17px', fontWeight: '800', color: '#0F172A' }}>{selected.student_name}</div>
                 <div style={{ fontSize: '13px', color: selected.session_type?.color, fontWeight: '700', marginTop: '2px' }}>{selected.session_type?.name}</div>
               </div>
-              <button onClick={() => setSelected(null)} style={{ background: '#F1F5F9', border: 'none', borderRadius: '8px', width: '28px', height: '28px', fontSize: '15px', cursor: 'pointer', color: '#64748B' }}>✕</button>
+              <button onClick={() => { setSelected(null); setResched(null) }} style={{ background: '#F1F5F9', border: 'none', borderRadius: '8px', width: '28px', height: '28px', fontSize: '15px', cursor: 'pointer', color: '#64748B' }}>✕</button>
             </div>
             <div style={{ padding: '16px 22px', display: 'flex', flexDirection: 'column', gap: '9px' }}>
               <div style={{ fontSize: '13px', color: '#475569' }}>📅 {new Date(selected.start_at).toLocaleString('en-GB', { timeZone: 'Africa/Cairo', weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</div>
@@ -373,12 +416,45 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
               )}
             </div>
 
+            {/* Reschedule form */}
+            {selected.status !== 'cancelled' && resched && (
+              <div style={{ padding: '0 22px 16px' }}>
+                <div style={{ background: '#F8FAFC', borderRadius: '12px', padding: '14px' }}>
+                  <div style={{ fontSize: '12px', fontWeight: '700', color: '#334155', marginBottom: '10px' }}>🕑 Move session to a new time</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
+                    <input type="date" value={resched.date} onChange={e => setResched(r => r && { ...r, date: e.target.value })}
+                      style={{ padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: '9px', fontSize: '13px', outline: 'none' }} />
+                    <input type="time" value={resched.time} onChange={e => setResched(r => r && { ...r, time: e.target.value })}
+                      style={{ padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: '9px', fontSize: '13px', outline: 'none' }} />
+                  </div>
+                  <select value={resched.duration} onChange={e => setResched(r => r && { ...r, duration: Number(e.target.value) })}
+                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: '9px', fontSize: '13px', outline: 'none', marginBottom: '10px' }}>
+                    {[30, 40, 60, 90, 120].map(d => <option key={d} value={d}>{d} min</option>)}
+                  </select>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button onClick={() => setResched(null)} disabled={busy}
+                      style={{ flex: 1, padding: '9px', background: '#fff', color: '#475569', border: '1px solid #E2E8F0', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
+                      Back
+                    </button>
+                    <button onClick={saveReschedule} disabled={busy}
+                      style={{ flex: 1, padding: '9px', background: '#0D1B2A', color: '#E8C97A', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
+                      {busy ? 'Saving…' : 'Save New Time'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Actions */}
-            {selected.status !== 'cancelled' && (
+            {selected.status !== 'cancelled' && !resched && (
               <div style={{ padding: '0 22px 20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <button onClick={remindNow} disabled={busy}
                   style={{ width: '100%', padding: '9px', background: '#DCFCE7', color: '#15803D', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
                   📲 Send WhatsApp reminder now
+                </button>
+                <button onClick={startReschedule} disabled={busy}
+                  style={{ width: '100%', padding: '9px', background: '#E0E7FF', color: '#3730A3', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
+                  🕑 Reschedule
                 </button>
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button onClick={cancelSession} disabled={busy}

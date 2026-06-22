@@ -155,6 +155,25 @@ export async function getCalendarEvent(eventId: string): Promise<FetchedEvent | 
   }
 }
 
+// Moves a Google Calendar event to a new time and notifies attendees.
+export async function updateCalendarEventTime(
+  eventId: string, startIso: string, endIso: string, timezone: string
+): Promise<void> {
+  if (!isGoogleConfigured() || !eventId) return
+  const token = await getAccessToken()
+  await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CALENDAR_ID)}/events/${eventId}?sendUpdates=all`,
+    {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        start: { dateTime: startIso, timeZone: timezone },
+        end:   { dateTime: endIso,   timeZone: timezone },
+      }),
+    }
+  )
+}
+
 // Cancels/deletes a Google Calendar event and notifies attendees.
 export async function deleteCalendarEvent(eventId: string): Promise<void> {
   if (!isGoogleConfigured() || !eventId) return
