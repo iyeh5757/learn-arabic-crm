@@ -50,11 +50,11 @@ function buildReminderText(data: SessionReminderData): string {
 }
 
 // Normalise to international format with no + or spaces.
-// Egyptian local numbers starting with 0 are converted to 20xxxxxxxxxx.
+// Numbers are stored WITH their country code already, so we only strip
+// formatting characters and any "00" / "+" international dialling prefix.
 function normalisePhone(phone: string): string {
-  let p = phone.replace(/\D/g, '')
-  if (p.startsWith('00')) p = p.slice(2)
-  else if (p.startsWith('0')) p = '20' + p.slice(1)
+  let p = phone.replace(/\D/g, '')   // drop +, spaces, dashes, parentheses
+  if (p.startsWith('00')) p = p.slice(2)  // 0044... -> 44...
   return p
 }
 
