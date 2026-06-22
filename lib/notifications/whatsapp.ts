@@ -1,9 +1,14 @@
 // lib/notifications/whatsapp.ts
-// Meta WhatsApp Cloud API integration
+// Evolution API integration (self-hosted WhatsApp gateway via WhatsApp Web)
+//
+// Required env vars:
+//   EVOLUTION_API_URL   e.g. https://evo.yourdomain.com   (no trailing slash)
+//   EVOLUTION_API_KEY   the global apikey for your instance
+//   EVOLUTION_INSTANCE  the instance name you created (e.g. "learnarabic")
 
-const META_API_URL = 'https://graph.facebook.com/v19.0'
-const PHONE_NUMBER_ID = process.env.META_PHONE_NUMBER_ID
-const ACCESS_TOKEN    = process.env.META_WHATSAPP_TOKEN
+const API_URL  = process.env.EVOLUTION_API_URL?.replace(/\/+$/, '')
+const API_KEY  = process.env.EVOLUTION_API_KEY
+const INSTANCE = process.env.EVOLUTION_INSTANCE
 
 export interface SessionReminderData {
   studentName:  string
@@ -40,43 +45,52 @@ function buildReminderText(data: SessionReminderData): string {
   if (data.meetLink) {
     lines.push(``, `🎥 *Join here:* ${data.meetLink}`)
   }
-  lines.push(``, `_Learn Arabic CRM — automated reminder_`)
+  lines.push(``, `_Learn Arabic Academy — automated reminder_`)
   return lines.join('\n')
+}
+
+// Normalise to international format with no + or spaces.
+// Egyptian local numbers starting with 0 are converted to 20xxxxxxxxxx.
+function normalisePhone(phone: string): string {
+  let p = phone.replace(/\D/g, '')
+  if (p.startsWith('00')) p = p.slice(2)
+  else if (p.startsWith('0')) p = '20' + p.slice(1)
+  return p
 }
 
 export async function sendWhatsAppReminder(
   phone: string,
   data: SessionReminderData
 ): Promise<{ success: boolean; error?: string }> {
-  if (!PHONE_NUMBER_ID || !ACCESS_TOKEN) {
-    return { success: false, error: 'WhatsApp credentials not configured' }
+  if (!API_URL || !API_KEY || !INSTANCE) {
+    return { success: false, error: 'Evolution API credentials not configured' }
   }
 
-  // Normalise phone: must start with country code, no + or spaces
-  const cleanPhone = phone.replace(/\D/g, '').replace(/^0/, '20') // Egypt default
+  const number = normalisePhone(phone)
 
+  // Evolution API v2 sendText endpoint
   const body = {
-    messaging_product: 'whatsapp',
-    to: cleanPhone,
-    type: 'text',
-    text: { body: buildReminderText(data), preview_url: false },
+    number,
+    text: buildReminderText(data),
   }
 
   try {
-    const res = await fetch(`${META_API_URL}/${PHONE_NUMBER_ID}/messages`, {
+    const res = await fetch(`${API_URL}/message/sendText/${INSTANCE}`, {
       method:  'POST',
       headers: {
-        Authorization:  `Bearer ${ACCESS_TOKEN}`,
+        apikey:         API_KEY,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
     })
 
-    const json = await res.json()
+    let json: any = null
+    try { json = await res.json() } catch { /* non-JSON response */ }
+
     if (!res.ok) {
-      const errMsg = json?.error?.message ?? `HTTP ${res.status}`
-      console.error('[WhatsApp] Send failed:', errMsg)
-      return { success: false, error: errMsg }
+      const errMsg = json?.message ?? json?.error ?? `HTTP ${res.status}`
+      console.error('[WhatsApp/Evolution] Send failed:', errMsg)
+      return { success: false, error: typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg) }
     }
     return { success: true }
   } catch (err: any) {
