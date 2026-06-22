@@ -1,6 +1,9 @@
 // app/api/calendar/sessions/route.ts
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
+import { createCalendarEventWithMeet, isGoogleConfigured } from '@/lib/calendar/google'
+
+export const runtime = 'nodejs'
 
 // GET /api/calendar/sessions?teacher_id=&start=&end=&status=
 export async function GET(req: Request) {
@@ -67,6 +70,35 @@ export async function POST(req: Request) {
     }
   }
 
+  // Generate a Google Calendar event + Meet link (non-fatal if Google isn't set up)
+  let googleEventId: string | null = null
+  let googleMeetLink: string | null = null
+  if (isGoogleConfigured()) {
+    try {
+      // Look up teacher email + session type name for a nicer invite
+      const [{ data: teacherRow }, { data: typeRow }] = await Promise.all([
+        supabase.from('teachers').select('profile:profiles!teachers_user_id_fkey(name, email)').eq('id', teacher_id).single(),
+        session_type_id ? supabase.from('session_type_config').select('name').eq('id', session_type_id).single() : Promise.resolve({ data: null }),
+      ])
+      const teacherEmail = (teacherRow as any)?.profile?.email ?? ''
+      const teacherName  = (teacherRow as any)?.profile?.name ?? 'Teacher'
+      const typeName     = (typeRow as any)?.name ?? 'Arabic'
+
+      const ev = await createCalendarEventWithMeet({
+        summary:     `${typeName} — ${student_name ?? 'Student'} with ${teacherName}`,
+        description: notes ?? '',
+        startIso:    start_at,
+        endIso:      end_at,
+        timezone:    'Africa/Cairo',
+        attendees:   [student_email, teacherEmail].filter(Boolean),
+      })
+      if (ev) { googleEventId = ev.eventId; googleMeetLink = ev.meetLink }
+    } catch (e: any) {
+      console.error('[Calendar] Google event creation failed:', e?.message)
+      // continue without Meet link
+    }
+  }
+
   const { data, error } = await supabase
     .from('calendar_sessions')
     .insert({
@@ -74,6 +106,9 @@ export async function POST(req: Request) {
       student_email, student_phone, start_at, end_at,
       duration_minutes, notes, sales_notes, supervisor_notes,
       recurring_rule_id,
+      google_event_id:  googleEventId,
+      google_meet_link: googleMeetLink,
+      google_synced_at: googleEventId ? new Date().toISOString() : null,
       force_booked: !!force_booked,
       force_booked_by:     force_booked ? user.id : null,
       force_booked_reason: force_booked_reason ?? null,
