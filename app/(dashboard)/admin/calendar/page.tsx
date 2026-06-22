@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import CalendarClient from './CalendarClient'
+import TestWhatsApp from './TestWhatsApp'
 
 export default async function CalendarPage() {
   const supabase = createClient()
@@ -41,6 +42,9 @@ export default async function CalendarPage() {
           </div>
         </div>
       </div>
+
+      {/* WhatsApp connection test */}
+      <TestWhatsApp />
 
       {/* Page header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
