@@ -12,9 +12,14 @@ export default async function AvailabilityBoardPage() {
 
   const { data: teacherRows } = await supabase
     .from('teachers')
-    .select('id, profile:profiles!teachers_user_id_fkey(name)')
+    .select('id, specialties, languages, profile:profiles!teachers_user_id_fkey(name)')
     .order('id')
-  const teachers = (teacherRows ?? []).map((t: any) => ({ id: t.id, name: t.profile?.name ?? 'Unknown' }))
+  const teachers = (teacherRows ?? []).map((t: any) => ({
+    id: t.id,
+    name: t.profile?.name ?? 'Unknown',
+    specialties: t.specialties ?? [],
+    languages: t.languages ?? [],
+  }))
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
