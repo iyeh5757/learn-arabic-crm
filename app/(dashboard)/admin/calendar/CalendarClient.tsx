@@ -37,7 +37,6 @@ const EMPTY_FORM = {
   days: [] as number[],
   force: false, force_reason: '',
   open_access: true, auto_record: false,
-  teacher_cohost: true, student_cohost: false, cohost_email: '',
 }
 
 // Offset (minutes) of a timezone at a given instant, via Intl — DST-safe.
@@ -175,14 +174,6 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
       force_booked_reason: force ? form.force_reason : null,
       open_access:      form.open_access,
       auto_record:      form.auto_record,
-      cohost_emails:    (() => {
-        const t = teachers.find(x => x.id === form.teacher_id)
-        const list: string[] = []
-        if (form.teacher_cohost && t?.email) list.push(t.email)
-        if (form.student_cohost && form.student_email) list.push(form.student_email)
-        if (form.cohost_email.trim()) list.push(form.cohost_email.trim())
-        return Array.from(new Set(list))
-      })(),
     }
 
     const res = await fetch('/api/calendar/sessions', {
@@ -210,15 +201,9 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
     if (api) { api.gotoDate(start); api.refetchEvents() }
     setModal(false); setSaving(false)
 
-    // Surface the Meet settings result so we know exactly what Google applied
-    const m = data?._meet
-    if (m) {
-      const parts: string[] = []
-      if (form.open_access) parts.push(`Open access: ${m.openAccess ? 'on' : 'failed'}`)
-      if (form.auto_record) parts.push(`Auto-record setting: ${m.autoRecord ? 'ENABLED ✓' : 'NOT enabled ✗'}`)
-      if (m.cohosts) parts.push(`Co-hosts added: ${(m.cohosts.added ?? []).join(', ') || 'none'}${m.cohosts.error ? ` (error: ${m.cohosts.error})` : ''}`)
-      if (m.spaceError) parts.push(`Meet error: ${m.spaceError}`)
-      if (parts.length) alert('Meeting settings applied:\n• ' + parts.join('\n• '))
+    // Only warn if the Google Meet couldn't be created at all
+    if (data?._meet?.spaceError) {
+      alert(`Note: the Google Meet couldn't be created (${data._meet.spaceError}). The session was saved without a Meet link.`)
     }
   }
 
@@ -638,28 +623,6 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
                     <div style={{ fontSize: '13px', fontWeight: '600', color: '#334155' }}>Auto-record</div>
                     <div style={{ fontSize: '11px', color: '#94A3B8' }}>Recording saves to the organizer's Google Drive</div>
                   </div>
-                </div>
-                <div>
-                  <div style={{ fontSize: '12px', color: '#64748B', fontWeight: 700, marginBottom: '6px' }}>Co-hosts</div>
-                  {(() => {
-                    const t = teachers.find(x => x.id === form.teacher_id)
-                    const teacherEmail = t?.email
-                    return (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: teacherEmail ? '#334155' : '#94A3B8' }}>
-                          <input type="checkbox" disabled={!teacherEmail} checked={form.teacher_cohost && !!teacherEmail}
-                            onChange={e => setForm(f => ({ ...f, teacher_cohost: e.target.checked }))} />
-                          Teacher{teacherEmail ? ` — ${teacherEmail}` : ' (select a teacher first)'}
-                        </label>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', color: form.student_email ? '#334155' : '#94A3B8' }}>
-                          <input type="checkbox" disabled={!form.student_email} checked={form.student_cohost && !!form.student_email}
-                            onChange={e => setForm(f => ({ ...f, student_cohost: e.target.checked }))} />
-                          Student{form.student_email ? ` — ${form.student_email}` : ' (no email on file)'}
-                        </label>
-                        <input style={{ ...inp, marginTop: '2px' }} type="email" placeholder="Other co-host email (optional)" value={form.cohost_email} onChange={e => setForm(f => ({ ...f, cohost_email: e.target.value }))} />
-                      </div>
-                    )
-                  })()}
                 </div>
               </div>
 
