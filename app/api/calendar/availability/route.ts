@@ -7,8 +7,8 @@ import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 
 const TZ = 'Africa/Cairo'
-const DEFAULT_START = 8 * 60    // 08:00 Cairo
-const DEFAULT_END   = 23 * 60   // 23:00 Cairo
+const DEFAULT_START = 0          // 00:00 — teachers are available all day
+const DEFAULT_END   = 24 * 60    // 24:00 — unless blocked or booked
 const STEP = 30                 // 30-minute granularity
 
 function minutesFromTime(t: string): number {
