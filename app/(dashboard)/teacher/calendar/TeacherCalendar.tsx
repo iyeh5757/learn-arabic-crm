@@ -68,12 +68,31 @@ export default function TeacherCalendar() {
   return (
     <>
       <style>{`
-        .fc { --fc-border-color:#EEF2F6; --fc-today-bg-color:#FFFBEB; font-size:13px; }
-        .fc .fc-toolbar-title { font-size:18px; font-weight:800; color:#0F172A; }
-        .fc .fc-button { background:#fff; border:1px solid #E2E8F0; color:#475569; font-weight:600; font-size:12px; text-transform:capitalize; border-radius:9px; }
-        .fc .fc-button-primary:not(:disabled).fc-button-active { background:#0D1B2A; border-color:#0D1B2A; color:#E8C97A; }
-        .fc .fc-event { border-radius:7px; border:none; border-left:3px solid; font-weight:600; cursor:pointer; }
-        .fc .fc-event-main { padding:2px 5px; }
+        .fc { --fc-border-color: #EEF2F6; --fc-today-bg-color: #FFFBEB;
+              --fc-now-indicator-color: #EF4444; font-size: 13px; }
+        .fc .fc-toolbar-title { font-size: 19px; font-weight: 800; color: #0F172A; letter-spacing: -0.01em; }
+        .fc .fc-button { background: #fff; border: 1px solid #E2E8F0; color: #475569;
+              font-weight: 600; font-size: 12px; text-transform: capitalize; padding: 6px 12px;
+              border-radius: 9px; box-shadow: none; transition: all 0.12s; }
+        .fc .fc-button:hover { background: #F8FAFC; border-color: #CBD5E1; color: #0F172A; }
+        .fc .fc-button-primary:not(:disabled).fc-button-active,
+        .fc .fc-button-primary:not(:disabled):active { background: #0D1B2A; border-color: #0D1B2A; color: #E8C97A; }
+        .fc .fc-button-primary:focus { box-shadow: 0 0 0 3px rgba(13,27,42,0.12); }
+        .fc .fc-button .fc-icon { font-size: 1.1em; }
+        .fc-theme-standard td, .fc-theme-standard th { border-color: #EEF2F6; }
+        .fc .fc-col-header-cell-cushion { font-size: 11px; font-weight: 700; color: #94A3B8;
+              text-transform: uppercase; letter-spacing: 0.05em; padding: 8px 4px; text-decoration: none; }
+        .fc .fc-timegrid-axis-cushion, .fc .fc-timegrid-slot-label-cushion { color: #94A3B8; font-size: 11px; font-weight: 500; }
+        .fc .fc-timegrid-slot { height: 44px; }
+        .fc-day-today .fc-col-header-cell-cushion { color: #0D1B2A; }
+        .fc .fc-event { border-radius: 7px; border: none; border-left: 3px solid; padding: 1px 2px;
+              font-weight: 600; cursor: pointer; box-shadow: 0 1px 2px rgba(0,0,0,0.06); transition: filter 0.1s; }
+        .fc .fc-event:hover { filter: brightness(0.95); }
+        .fc .fc-event-main { padding: 2px 5px; }
+        .fc .fc-timegrid-now-indicator-line { border-width: 2px; }
+        .fc-highlight { background: rgba(13,27,42,0.06); border-radius: 6px; }
+        .fc .fc-list-event:hover td { background: #F8FAFC; }
+        .fc .fc-list-event-dot { border-radius: 3px; }
       `}</style>
 
       <div style={{ background:'#fff', borderRadius:'18px', padding:'18px 20px', border:'1px solid #F1F5F9', boxShadow:'0 1px 3px rgba(15,23,42,0.06)' }}>
