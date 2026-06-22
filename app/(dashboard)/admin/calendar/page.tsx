@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import CalendarClient from './CalendarClient'
 import TestWhatsApp from './TestWhatsApp'
+import GoogleStatus from './GoogleStatus'
 
 export default async function CalendarPage() {
   const supabase = createClient()
@@ -21,7 +22,7 @@ export default async function CalendarPage() {
   ] = await Promise.all([
     supabase.from('session_type_config').select('id, name, color').eq('is_active', true).order('sort_order'),
     supabase.from('teachers').select('id, profile:profiles!teachers_user_id_fkey(name)').order('id'),
-    supabase.from('students').select('id, name, email, phone').eq('student_status', 'active').order('name'),
+    supabase.from('students').select('id, name, email, phone').in('student_status', ['active', 'trial']).order('name'),
   ])
 
   const teachers = (teacherRows ?? []).map((t: any) => ({
@@ -43,8 +44,9 @@ export default async function CalendarPage() {
         </div>
       </div>
 
-      {/* WhatsApp connection test */}
+      {/* Integration status / tests */}
       <TestWhatsApp />
+      <GoogleStatus />
 
       {/* Page header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

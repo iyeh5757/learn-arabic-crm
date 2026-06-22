@@ -55,6 +55,25 @@ async function getAccessToken(): Promise<string> {
   return json.access_token
 }
 
+// Verify the service account + key + domain-wide delegation actually work
+// by requesting an impersonated access token. Returns a clear error if not.
+export async function testGoogleConnection(): Promise<{ ok: boolean; error?: string }> {
+  if (!isGoogleConfigured()) {
+    const missing = [
+      !SA_EMAIL && 'GOOGLE_SERVICE_ACCOUNT_EMAIL',
+      !SA_KEY && 'GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY',
+      !IMPERSONATE && 'GOOGLE_IMPERSONATE_EMAIL',
+    ].filter(Boolean).join(', ')
+    return { ok: false, error: `Missing env vars: ${missing}` }
+  }
+  try {
+    await getAccessToken()
+    return { ok: true }
+  } catch (e: any) {
+    return { ok: false, error: e?.message ?? 'Unknown error' }
+  }
+}
+
 export interface CreateEventInput {
   summary:     string
   description?: string
