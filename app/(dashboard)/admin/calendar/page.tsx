@@ -38,18 +38,6 @@ export default async function CalendarPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      {/* Preview banner */}
-      <div style={{ background: '#FFF7ED', border: '1px solid #FED7AA', borderRadius: '12px', padding: '12px 18px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-        <span style={{ fontSize: '18px' }}>🚧</span>
-        <div>
-          <div style={{ fontSize: '13px', fontWeight: '700', color: '#92400E' }}>Preview Mode — Not Production</div>
-          <div style={{ fontSize: '12px', color: '#B45309', marginTop: '2px' }}>
-            This module requires the calendar schema migration to be applied to your Supabase database before it is fully functional.
-            See <code style={{ background: '#FEF3C7', padding: '1px 5px', borderRadius: '4px' }}>supabase/migrations/preview_calendar_schema.sql</code>
-          </div>
-        </div>
-      </div>
-
       {/* Integration status / tests */}
       <TestWhatsApp />
       <GoogleStatus />
