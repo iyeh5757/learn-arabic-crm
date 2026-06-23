@@ -6,7 +6,6 @@ import listPlugin from '@fullcalendar/list'
 import interactionPlugin from '@fullcalendar/interaction'
 import luxon3Plugin from '@fullcalendar/luxon3'
 import { useState, useCallback, useRef, useMemo } from 'react'
-import { createClient } from '@/lib/supabase/client'
 
 const inp: React.CSSProperties = {
   padding: '9px 11px', border: '1px solid #E2E8F0', borderRadius: '10px',
@@ -36,7 +35,7 @@ const EMPTY_FORM = {
   student_name: '', student_email: '', student_phone: '',
   date: '', start_time: '', duration_minutes: 60,
   notes: '', recurring: false,
-  days: [] as number[],
+  days: [] as number[], weeks: 8,
   force: false, force_reason: '',
   open_access: true, auto_record: false,
 }
@@ -82,7 +81,6 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
   const [resched, setResched] = useState<null | { date: string; time: string; duration: number }>(null)
   const filterTeacherRef    = useRef('')
   const filterSupervisorRef = useRef('')
-  const supabase = createClient()
 
   const loadEvents = useCallback(async (fetchInfo: any, successCb: any, failureCb: any) => {
     try {
@@ -182,8 +180,42 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
   async function handleSubmit(force = false) {
     setSaving(true); setError('')
     const start = cairoToUtc(form.date, form.start_time)
-    const end   = new Date(start.getTime() + form.duration_minutes * 60000)
 
+    // Recurring: generate one session per selected weekday over N weeks
+    if (form.recurring && form.days.length > 0) {
+      if (!form.date || !form.start_time || !form.teacher_id) {
+        setError('Pick a teacher, start date and time first.'); setSaving(false); return
+      }
+      const res = await fetch('/api/calendar/sessions/recurring', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session_type_id: form.session_type_id || null,
+          teacher_id:      form.teacher_id,
+          student_id:      form.student_id || null,
+          student_name:    form.student_name,
+          student_email:   form.student_email,
+          student_phone:   form.student_phone,
+          start_date:      form.date,
+          start_time:      form.start_time,
+          duration_minutes: form.duration_minutes,
+          days_of_week:    form.days,
+          weeks:           form.weeks,
+          notes:           form.notes,
+          open_access:     form.open_access,
+          auto_record:     form.auto_record,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setError(data?.error ?? 'Failed to create recurring sessions'); setSaving(false); return }
+      const api = calRef.current?.getApi()
+      if (api) { api.gotoDate(start); api.refetchEvents() }
+      setModal(false); setSaving(false)
+      alert(`✅ Created ${data.created} recurring sessions across your selected days.`)
+      return
+    }
+
+    // Single session
+    const end = new Date(start.getTime() + form.duration_minutes * 60000)
     const payload = {
       session_type_id:  form.session_type_id || null,
       teacher_id:       form.teacher_id,
@@ -209,17 +241,6 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
 
     if (res.status === 409) { setConflict(true); setSaving(false); return }
     if (!res.ok) { setError(data?.error ?? 'Failed to save'); setSaving(false); return }
-
-    if (form.recurring && form.days.length > 0) {
-      await supabase.from('recurring_rules').insert({
-        teacher_id:       form.teacher_id,
-        student_id:       form.student_id || null,
-        session_type_id:  form.session_type_id || null,
-        days_of_week:     form.days,
-        start_time:       form.start_time + ':00',
-        duration_minutes: form.duration_minutes,
-      })
-    }
 
     // Jump the calendar to the new session's date and refresh so it's always visible
     const api = calRef.current?.getApi()
@@ -617,8 +638,8 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
                 </div>
                 {form.recurring && (
                   <div>
-                    <div style={{ fontSize: '11px', color: '#94A3B8', marginBottom: '8px' }}>Repeats weekly on these days, indefinitely until cancelled</div>
-                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    <div style={{ fontSize: '11px', color: '#94A3B8', marginBottom: '8px' }}>Repeats weekly on these days, starting from the date above</div>
+                    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '10px' }}>
                       {DAY_LABELS.map((d, i) => (
                         <button key={i} onClick={() => toggleDay(i)}
                           style={{ padding: '6px 11px', borderRadius: '9px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', border: '1.5px solid', borderColor: form.days.includes(i) ? '#0D1B2A' : '#E2E8F0', background: form.days.includes(i) ? '#0D1B2A' : '#fff', color: form.days.includes(i) ? '#E8C97A' : '#64748B' }}>
@@ -626,6 +647,13 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
                         </button>
                       ))}
                     </div>
+                    <label style={{ fontSize: '12px', color: '#475569', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      Repeat for
+                      <input type="number" min={1} max={26} value={form.weeks}
+                        onChange={e => setForm(f => ({ ...f, weeks: Math.max(1, Math.min(26, Number(e.target.value) || 1)) }))}
+                        style={{ width: '64px', padding: '6px 8px', border: '1px solid #E2E8F0', borderRadius: '8px', fontSize: '13px' }} />
+                      weeks
+                    </label>
                   </div>
                 )}
               </div>

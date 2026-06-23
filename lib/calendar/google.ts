@@ -196,7 +196,7 @@ export async function addMeetCoHosts(
 // (made via the Meet API). First tries to attach it as a real conference so the
 // native "Join with Google Meet" button shows; falls back to a description link.
 export async function createCalendarEventWithLink(
-  input: CreateEventInput, meetLink: string
+  input: CreateEventInput, meetLink: string, sendUpdates: 'all' | 'none' = 'all'
 ): Promise<CreatedEvent | null> {
   if (!isGoogleConfigured()) return null
   const token = await getAccessToken()
@@ -220,7 +220,7 @@ export async function createCalendarEventWithLink(
       entryPoints: [{ entryPointType: 'video', uri: meetLink, label: code }],
     },
   }
-  let res = await fetch(`${calBase}?conferenceDataVersion=1&sendUpdates=all`, {
+  let res = await fetch(`${calBase}?conferenceDataVersion=1&sendUpdates=${sendUpdates}`, {
     method:  'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body:    JSON.stringify(withConf),
@@ -228,7 +228,7 @@ export async function createCalendarEventWithLink(
 
   // Attempt 2 (fallback): plain event, link in description only
   if (!res.ok) {
-    res = await fetch(`${calBase}?sendUpdates=all`, {
+    res = await fetch(`${calBase}?sendUpdates=${sendUpdates}`, {
       method:  'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
       body:    JSON.stringify(base),
