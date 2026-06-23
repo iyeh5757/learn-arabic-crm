@@ -23,7 +23,8 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     .select(`
       id, student_name, student_phone, start_at, duration_minutes, google_meet_link,
       session_type:session_type_config(name),
-      teacher:teachers(profile:profiles!teachers_user_id_fkey(name))
+      teacher:teachers(profile:profiles!teachers_user_id_fkey(name)),
+      student:students(country)
     `)
     .eq('id', params.id)
     .single()
@@ -41,6 +42,7 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
     durationMins: s.duration_minutes,
     meetLink:     s.google_meet_link ?? undefined,
     hoursBeforeLabel: '24 hours',
+    studentCountry: (s.student as any)?.country ?? undefined,
   })
 
   // log it

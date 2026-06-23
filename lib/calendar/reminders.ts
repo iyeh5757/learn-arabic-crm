@@ -19,13 +19,15 @@ type SessionRow = {
   reminder_1h_sent: boolean
   session_type?: { name?: string } | null
   teacher?: { profile?: { name?: string } } | null
+  student?: { country?: string } | null
 }
 
 const SELECT = `
   id, student_name, student_phone, start_at, duration_minutes, google_meet_link,
   reminder_24h_sent, reminder_12h_sent, reminder_1h_sent,
   session_type:session_type_config(name),
-  teacher:teachers(profile:profiles!teachers_user_id_fkey(name))
+  teacher:teachers(profile:profiles!teachers_user_id_fkey(name)),
+  student:students(country)
 `
 
 // Decide which reminder (if any) is due for a session right now.
@@ -69,6 +71,7 @@ export async function sendDueReminderForSession(
     durationMins: s.duration_minutes,
     meetLink:     s.google_meet_link ?? undefined,
     hoursBeforeLabel: due.label,
+    studentCountry: s.student?.country ?? undefined,
   })
 
   await supabase.from('session_reminder_log').insert({

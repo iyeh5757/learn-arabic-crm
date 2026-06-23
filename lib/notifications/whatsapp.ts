@@ -31,40 +31,88 @@ export interface SessionReminderData {
   durationMins: number
   meetLink?:    string
   hoursBeforeLabel: '24 hours' | '12 hours' | '1 hour'
+  studentCountry?: string   // used to show the student's local time too
 }
 
-function formatTime(date: Date): string {
+// Best-effort primary IANA timezone per country (the agreed chat time governs)
+const COUNTRY_TZ: Record<string, string> = {
+  'Afghanistan': 'Asia/Kabul', 'Albania': 'Europe/Tirane', 'Algeria': 'Africa/Algiers',
+  'Angola': 'Africa/Luanda', 'Argentina': 'America/Argentina/Buenos_Aires', 'Armenia': 'Asia/Yerevan',
+  'Australia': 'Australia/Sydney', 'Austria': 'Europe/Vienna', 'Azerbaijan': 'Asia/Baku',
+  'Bahrain': 'Asia/Bahrain', 'Bangladesh': 'Asia/Dhaka', 'Belarus': 'Europe/Minsk', 'Belgium': 'Europe/Brussels',
+  'Bolivia': 'America/La_Paz', 'Bosnia and Herzegovina': 'Europe/Sarajevo', 'Brazil': 'America/Sao_Paulo',
+  'Bulgaria': 'Europe/Sofia', 'Cambodia': 'Asia/Phnom_Penh', 'Canada': 'America/Toronto', 'Chile': 'America/Santiago',
+  'China': 'Asia/Shanghai', 'Colombia': 'America/Bogota', 'Croatia': 'Europe/Zagreb', 'Cyprus': 'Asia/Nicosia',
+  'Czech Republic': 'Europe/Prague', 'Denmark': 'Europe/Copenhagen', 'Dominican Republic': 'America/Santo_Domingo',
+  'Ecuador': 'America/Guayaquil', 'Egypt': 'Africa/Cairo', 'El Salvador': 'America/El_Salvador', 'Estonia': 'Europe/Tallinn',
+  'Ethiopia': 'Africa/Addis_Ababa', 'Finland': 'Europe/Helsinki', 'France': 'Europe/Paris', 'Georgia': 'Asia/Tbilisi',
+  'Germany': 'Europe/Berlin', 'Ghana': 'Africa/Accra', 'Greece': 'Europe/Athens', 'Guatemala': 'America/Guatemala',
+  'Honduras': 'America/Tegucigalpa', 'Hungary': 'Europe/Budapest', 'India': 'Asia/Kolkata', 'Indonesia': 'Asia/Jakarta',
+  'Iran': 'Asia/Tehran', 'Iraq': 'Asia/Baghdad', 'Ireland': 'Europe/Dublin', 'Israel': 'Asia/Jerusalem',
+  'Italy': 'Europe/Rome', 'Jamaica': 'America/Jamaica', 'Japan': 'Asia/Tokyo', 'Jordan': 'Asia/Amman',
+  'Kazakhstan': 'Asia/Almaty', 'Kenya': 'Africa/Nairobi', 'Kuwait': 'Asia/Kuwait', 'Lebanon': 'Asia/Beirut',
+  'Libya': 'Africa/Tripoli', 'Luxembourg': 'Europe/Luxembourg', 'Malaysia': 'Asia/Kuala_Lumpur', 'Malta': 'Europe/Malta',
+  'Mexico': 'America/Mexico_City', 'Morocco': 'Africa/Casablanca', 'Netherlands': 'Europe/Amsterdam',
+  'New Zealand': 'Pacific/Auckland', 'Nigeria': 'Africa/Lagos', 'Norway': 'Europe/Oslo', 'Oman': 'Asia/Muscat',
+  'Pakistan': 'Asia/Karachi', 'Palestine': 'Asia/Gaza', 'Peru': 'America/Lima', 'Philippines': 'Asia/Manila',
+  'Poland': 'Europe/Warsaw', 'Portugal': 'Europe/Lisbon', 'Qatar': 'Asia/Qatar', 'Romania': 'Europe/Bucharest',
+  'Russia': 'Europe/Moscow', 'Saudi Arabia': 'Asia/Riyadh', 'Senegal': 'Africa/Dakar', 'Serbia': 'Europe/Belgrade',
+  'Singapore': 'Asia/Singapore', 'Somalia': 'Africa/Mogadishu', 'South Africa': 'Africa/Johannesburg',
+  'South Korea': 'Asia/Seoul', 'Spain': 'Europe/Madrid', 'Sri Lanka': 'Asia/Colombo', 'Sudan': 'Africa/Khartoum',
+  'Sweden': 'Europe/Stockholm', 'Switzerland': 'Europe/Zurich', 'Syria': 'Asia/Damascus', 'Tanzania': 'Africa/Dar_es_Salaam',
+  'Thailand': 'Asia/Bangkok', 'Tunisia': 'Africa/Tunis', 'Turkey': 'Europe/Istanbul', 'Uganda': 'Africa/Kampala',
+  'Ukraine': 'Europe/Kiev', 'United Arab Emirates': 'Asia/Dubai', 'United Kingdom': 'Europe/London',
+  'United States': 'America/New_York', 'Uzbekistan': 'Asia/Tashkent', 'Venezuela': 'America/Caracas',
+  'Vietnam': 'Asia/Ho_Chi_Minh', 'Yemen': 'Asia/Aden', 'Zimbabwe': 'Africa/Harare',
+}
+
+function formatTime(date: Date, timeZone: string): string {
   return date.toLocaleString('en-GB', {
-    timeZone: 'Africa/Cairo',
-    weekday: 'long',
-    month:   'short',
-    day:     'numeric',
-    hour:    '2-digit',
-    minute:  '2-digit',
-    hour12:  true,
+    timeZone, weekday: 'long', month: 'short', day: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: true,
   })
 }
 
 function buildReminderText(data: SessionReminderData): string {
-  const time = formatTime(data.startAt)
+  const isTrial = (data.sessionType ?? '').toLowerCase().includes('trial')
+  const cairoTime = formatTime(data.startAt, 'Africa/Cairo')
+  const studentTz = data.studentCountry ? COUNTRY_TZ[data.studentCountry] : undefined
+
   const lines = [
     `📚 *Arabic Class Reminder*`,
     ``,
     `Hi ${data.studentName}! Your ${data.sessionType} session with *${data.teacherName}* starts in *${data.hoursBeforeLabel}*.`,
     ``,
-    `🗓 *${time} (Cairo time)*`,
-    `⏱ Duration: ${data.durationMins} minutes`,
   ]
+
+  // Show the student's local time + Egypt time when we know their country
+  if (studentTz && studentTz !== 'Africa/Cairo') {
+    lines.push(
+      `🗓 *Your time:* ${formatTime(data.startAt, studentTz)}`,
+      `🇪🇬 *Egypt time:* ${cairoTime}`,
+    )
+  } else {
+    lines.push(`🗓 *${cairoTime} (Egypt / Cairo time)*`)
+  }
+  lines.push(`⏱ Duration: ${data.durationMins} minutes`)
+
   if (data.meetLink) {
     lines.push(``, `🎥 *Join here:* ${data.meetLink}`)
   }
-  // Reschedule notice only on the earlier reminders (not the 1-hour one)
-  if (data.hoursBeforeLabel === '24 hours' || data.hoursBeforeLabel === '12 hours') {
-    lines.push(
-      ``,
-      `📌 Need to reschedule? Please reach out to your supervisor in your group so they can help. Reschedule requests must be made *at least 12 hours in advance* — otherwise the class will be counted.`
-    )
+
+  if (studentTz && studentTz !== 'Africa/Cairo') {
+    lines.push(``, `ℹ️ Egypt time may be different from your local time — your class is held at the time we agreed in our chat.`)
   }
+
+  // Reschedule / cancel notice only on the earlier reminders (not the 1-hour one)
+  if (data.hoursBeforeLabel === '24 hours' || data.hoursBeforeLabel === '12 hours') {
+    if (isTrial) {
+      lines.push(``, `📌 Need to reschedule or cancel? Please message us here in our chat and we'll be happy to help.`)
+    } else {
+      lines.push(``, `📌 Need to reschedule? Please reach out to your supervisor in your group so they can help. Reschedule requests must be made *at least 12 hours in advance* — otherwise the class will be counted.`)
+    }
+  }
+
   lines.push(``, `_Learn Arabic Academy — automated reminder_`)
   return lines.join('\n')
 }
