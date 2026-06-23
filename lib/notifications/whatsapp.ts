@@ -6,6 +6,8 @@
 //   EVOLUTION_API_KEY   the global apikey for your instance
 //   EVOLUTION_INSTANCE  the instance name you created (e.g. "learnarabic")
 
+import { COUNTRY_TZ } from '@/lib/countries'
+
 // Strip any non-printable / non-ASCII characters that can sneak in when
 // pasting credentials (e.g. U+2028 line separators) — HTTP headers must be ASCII.
 function clean(v?: string): string {
@@ -32,38 +34,6 @@ export interface SessionReminderData {
   meetLink?:    string
   hoursBeforeLabel: '24 hours' | '12 hours' | '1 hour'
   studentCountry?: string   // used to show the student's local time too
-}
-
-// Best-effort primary IANA timezone per country (the agreed chat time governs)
-const COUNTRY_TZ: Record<string, string> = {
-  'Afghanistan': 'Asia/Kabul', 'Albania': 'Europe/Tirane', 'Algeria': 'Africa/Algiers',
-  'Angola': 'Africa/Luanda', 'Argentina': 'America/Argentina/Buenos_Aires', 'Armenia': 'Asia/Yerevan',
-  'Australia': 'Australia/Sydney', 'Austria': 'Europe/Vienna', 'Azerbaijan': 'Asia/Baku',
-  'Bahrain': 'Asia/Bahrain', 'Bangladesh': 'Asia/Dhaka', 'Belarus': 'Europe/Minsk', 'Belgium': 'Europe/Brussels',
-  'Bolivia': 'America/La_Paz', 'Bosnia and Herzegovina': 'Europe/Sarajevo', 'Brazil': 'America/Sao_Paulo',
-  'Bulgaria': 'Europe/Sofia', 'Cambodia': 'Asia/Phnom_Penh', 'Canada': 'America/Toronto', 'Chile': 'America/Santiago',
-  'China': 'Asia/Shanghai', 'Colombia': 'America/Bogota', 'Croatia': 'Europe/Zagreb', 'Cyprus': 'Asia/Nicosia',
-  'Czech Republic': 'Europe/Prague', 'Denmark': 'Europe/Copenhagen', 'Dominican Republic': 'America/Santo_Domingo',
-  'Ecuador': 'America/Guayaquil', 'Egypt': 'Africa/Cairo', 'El Salvador': 'America/El_Salvador', 'Estonia': 'Europe/Tallinn',
-  'Ethiopia': 'Africa/Addis_Ababa', 'Finland': 'Europe/Helsinki', 'France': 'Europe/Paris', 'Georgia': 'Asia/Tbilisi',
-  'Germany': 'Europe/Berlin', 'Ghana': 'Africa/Accra', 'Greece': 'Europe/Athens', 'Guatemala': 'America/Guatemala',
-  'Honduras': 'America/Tegucigalpa', 'Hungary': 'Europe/Budapest', 'India': 'Asia/Kolkata', 'Indonesia': 'Asia/Jakarta',
-  'Iran': 'Asia/Tehran', 'Iraq': 'Asia/Baghdad', 'Ireland': 'Europe/Dublin', 'Israel': 'Asia/Jerusalem',
-  'Italy': 'Europe/Rome', 'Jamaica': 'America/Jamaica', 'Japan': 'Asia/Tokyo', 'Jordan': 'Asia/Amman',
-  'Kazakhstan': 'Asia/Almaty', 'Kenya': 'Africa/Nairobi', 'Kuwait': 'Asia/Kuwait', 'Lebanon': 'Asia/Beirut',
-  'Libya': 'Africa/Tripoli', 'Luxembourg': 'Europe/Luxembourg', 'Malaysia': 'Asia/Kuala_Lumpur', 'Malta': 'Europe/Malta',
-  'Mexico': 'America/Mexico_City', 'Morocco': 'Africa/Casablanca', 'Netherlands': 'Europe/Amsterdam',
-  'New Zealand': 'Pacific/Auckland', 'Nigeria': 'Africa/Lagos', 'Norway': 'Europe/Oslo', 'Oman': 'Asia/Muscat',
-  'Pakistan': 'Asia/Karachi', 'Palestine': 'Asia/Gaza', 'Peru': 'America/Lima', 'Philippines': 'Asia/Manila',
-  'Poland': 'Europe/Warsaw', 'Portugal': 'Europe/Lisbon', 'Qatar': 'Asia/Qatar', 'Romania': 'Europe/Bucharest',
-  'Russia': 'Europe/Moscow', 'Saudi Arabia': 'Asia/Riyadh', 'Senegal': 'Africa/Dakar', 'Serbia': 'Europe/Belgrade',
-  'Singapore': 'Asia/Singapore', 'Somalia': 'Africa/Mogadishu', 'South Africa': 'Africa/Johannesburg',
-  'South Korea': 'Asia/Seoul', 'Spain': 'Europe/Madrid', 'Sri Lanka': 'Asia/Colombo', 'Sudan': 'Africa/Khartoum',
-  'Sweden': 'Europe/Stockholm', 'Switzerland': 'Europe/Zurich', 'Syria': 'Asia/Damascus', 'Tanzania': 'Africa/Dar_es_Salaam',
-  'Thailand': 'Asia/Bangkok', 'Tunisia': 'Africa/Tunis', 'Turkey': 'Europe/Istanbul', 'Uganda': 'Africa/Kampala',
-  'Ukraine': 'Europe/Kiev', 'United Arab Emirates': 'Asia/Dubai', 'United Kingdom': 'Europe/London',
-  'United States': 'America/New_York', 'Uzbekistan': 'Asia/Tashkent', 'Venezuela': 'America/Caracas',
-  'Vietnam': 'Asia/Ho_Chi_Minh', 'Yemen': 'Asia/Aden', 'Zimbabwe': 'Africa/Harare',
 }
 
 function formatTime(date: Date, timeZone: string): string {
