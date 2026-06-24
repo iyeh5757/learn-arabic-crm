@@ -45,9 +45,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Missing required fields for recurring booking' }, { status: 400 })
   }
 
-  // Book up to an 8-week initial horizon now; the hourly cron extends active
-  // series further (so "never ends" keeps rolling, and long fixed series fill in).
-  const INITIAL_WEEKS = 8
+  // Book a small initial horizon now (keeps booking fast); the hourly cron
+  // extends active series to ~8 weeks ahead afterwards (and rolls "never ends").
+  const INITIAL_WEEKS = 3
   const genWeeks = never_end ? INITIAL_WEEKS : Math.min(weeks, INITIAL_WEEKS)
 
   // until_date: null = never-ending; otherwise start_date + weeks
@@ -71,11 +71,17 @@ export async function POST(req: Request) {
   }
   if (occurrences.length === 0) return NextResponse.json({ error: 'No upcoming dates to book (all selected dates are in the past)' }, { status: 400 })
 
-  // Create the rule
-  const { data: rule } = await supabase.from('recurring_rules').insert({
+  // Create the rule — abort if this fails so we never create unlinked sessions
+  const { data: rule, error: ruleErr } = await supabase.from('recurring_rules').insert({
     teacher_id, student_id: student_id || null, session_type_id: session_type_id || null,
     days_of_week, start_time: start_time + ':00', duration_minutes, until_date: untilDate, created_by: user.id,
   }).select().single()
+  if (ruleErr || !rule) {
+    const hint = (ruleErr?.message ?? '').includes('until_date')
+      ? ' — run: alter table recurring_rules add column if not exists until_date date;'
+      : ''
+    return NextResponse.json({ error: `Could not create recurring series: ${ruleErr?.message ?? 'unknown'}${hint}` }, { status: 400 })
+  }
 
   // Look up teacher email + type name + one shared Meet link for the whole series
   const [{ data: teacherRow }, { data: typeRow }] = await Promise.all([
