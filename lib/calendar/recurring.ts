@@ -3,7 +3,7 @@
 // with sessions ~8 weeks ahead, so "never-ending" series never run out. Fixed
 // series stop at their until_date.
 
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createCalendarEventWithLink, isGoogleConfigured } from './google'
 
 const TZ = 'Africa/Cairo'
@@ -25,7 +25,7 @@ function fmtDate(d: Date): string {
 }
 
 export async function topUpRecurringRules(): Promise<{ rules: number; created: number }> {
-  const supabase = createClient()
+  const supabase = createAdminClient()
   const { data: rules } = await supabase.from('recurring_rules').select('*').eq('is_active', true)
   let created = 0
   for (const rule of rules ?? []) {

@@ -221,6 +221,13 @@ create policy "Teacher manages own availability" on teacher_availability
 create policy "Admin manages all availability" on teacher_availability
   for all to public using (current_user_role() = 'admin');
 
+-- recurring_rules
+create policy "Read recurring rules" on recurring_rules
+  for select to public using (current_user_role() in ('admin','sales','supervisor','teacher'));
+create policy "Manage recurring rules" on recurring_rules
+  for all to public using (current_user_role() in ('admin','sales','supervisor'))
+  with check (current_user_role() in ('admin','sales','supervisor'));
+
 -- calendar_blocks
 create policy "Teacher manages own blocks" on calendar_blocks
   for all to public using (

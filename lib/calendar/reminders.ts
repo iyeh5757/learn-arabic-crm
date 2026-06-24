@@ -4,7 +4,7 @@
 // booked late (e.g. 45 min before start) still gets its 1-hour reminder, and
 // reminders that became moot (e.g. the 24h mark already passed) are skipped.
 
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { sendWhatsAppReminder } from '@/lib/notifications/whatsapp'
 
 type SessionRow = {
@@ -103,7 +103,7 @@ export async function remindSessionIfDue(supabase: any, sessionId: string): Prom
 export async function processSessionReminders(): Promise<{
   processed: number; sent: number; failed: number; skipped: number
 }> {
-  const supabase = createClient()
+  const supabase = createAdminClient()   // cron has no user — bypass RLS safely
   const now = new Date()
   const horizon = new Date(now.getTime() + 25 * 3_600_000).toISOString()
 

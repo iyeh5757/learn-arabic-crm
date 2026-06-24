@@ -2,7 +2,7 @@
 // Inbound sync: reconcile CRM sessions against their Google Calendar events.
 // Detects events deleted/cancelled or moved in Google and updates the CRM.
 
-import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getCalendarEvent, isGoogleConfigured } from './google'
 
 export async function syncFromGoogle(): Promise<{
@@ -15,7 +15,7 @@ export async function syncFromGoogle(): Promise<{
     return { checked: 0, removed: 0, rescheduled: 0, skipped: 0 }
   }
 
-  const supabase = createClient()
+  const supabase = createAdminClient()
   const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
   const { data: sessions } = await supabase
