@@ -69,10 +69,7 @@ export default function AccountantPaymentEditPage() {
           <div style={{ padding:'14px 22px', borderBottom:'1px solid #F3F4F6', fontWeight:'600', fontSize:'15px', color:'#111827' }}>Payment Details</div>
           <div style={grid}>
             <div><label style={lbl}>Number of Classes</label>
-              <select style={inp} value={form.number_of_classes} onChange={e=>setForm((f:any)=>({...f,number_of_classes:Number(e.target.value)}))}>
-                {[4,8,12,16,20].map(n=><option key={n} value={n}>{n} sessions{n===16?' ⭐':''}</option>)}
-                {![4,8,12,16,20].includes(Number(form.number_of_classes)) && <option value={form.number_of_classes}>{form.number_of_classes} sessions (current)</option>}
-              </select>
+              <input type="number" min={1} style={inp} value={form.number_of_classes} onChange={e=>setForm((f:any)=>({...f,number_of_classes:Number(e.target.value)}))} placeholder="Enter number of classes" />
             </div>
             <div><label style={lbl}>Amount</label>
               <div style={{ position:'relative' }}>

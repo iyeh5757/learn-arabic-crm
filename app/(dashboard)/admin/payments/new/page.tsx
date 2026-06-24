@@ -5,8 +5,6 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 
-const PLANS_60 = [4, 8, 12, 16, 20]
-const PLANS_30 = [4, 8, 12, 16, 20]
 
 function NewPaymentPageInner() {
   const today = (() => {
@@ -129,9 +127,7 @@ function NewPaymentPageInner() {
             </div>
             <div>
               <label style={lbl}>Number of Classes *</label>
-              <select style={inp} value={form.number_of_classes} onChange={e => setForm(f => ({...f, number_of_classes: Number(e.target.value)}))}>
-                {PLANS_60.map(n => <option key={n} value={n}>{n} sessions{n === 16 ? ' ⭐ Most Popular' : ''}</option>)}
-              </select>
+              <input type="number" min={1} style={inp} value={form.number_of_classes} onChange={e => setForm(f => ({...f, number_of_classes: Number(e.target.value)}))} placeholder="Enter number of classes, e.g. 10" />
             </div>
             <div>
               <label style={lbl}>Amount *</label>

@@ -12,23 +12,6 @@ interface Props {
   preselectedStudentId?: string
 }
 
-const PLANS = {
-  '60': [
-    { sessions: 4,  label: '4 sessions' },
-    { sessions: 8,  label: '8 sessions' },
-    { sessions: 12, label: '12 sessions' },
-    { sessions: 16, label: '16 sessions ⭐ Popular', popular: true },
-    { sessions: 20, label: '20 sessions' },
-  ],
-  '30': [
-    { sessions: 4,  label: '4 sessions' },
-    { sessions: 8,  label: '8 sessions' },
-    { sessions: 12, label: '12 sessions' },
-    { sessions: 16, label: '16 sessions ⭐ Popular', popular: true },
-    { sessions: 20, label: '20 sessions' },
-  ],
-}
-
 export default function PaymentForm({
   students, currentUserId, payment, redirectTo, preselectedStudentId
 }: Props) {
@@ -105,13 +88,9 @@ export default function PaymentForm({
 
           <div>
             <label className="label">Number of Classes *</label>
-            <select className="input" value={form.number_of_classes}
-              onChange={e => setForm(f => ({...f, number_of_classes: Number(e.target.value)}))}>
-              {PLANS[selectedStudent?.session_duration === 30 ? '30' : '60'].map(p => (
-                <option key={p.sessions} value={p.sessions}>{p.label}</option>
-              ))}
-              <option value={1}>Custom amount</option>
-            </select>
+            <input type="number" min={1} className="input" value={form.number_of_classes}
+              onChange={e => setForm(f => ({...f, number_of_classes: Number(e.target.value)}))}
+              placeholder="Enter number of classes, e.g. 10" />
           </div>
 
           <div>
