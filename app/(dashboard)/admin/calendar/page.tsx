@@ -1,10 +1,10 @@
 // app/(dashboard)/admin/calendar/page.tsx
-// PREVIEW MODE — Calendar & Scheduling Hub
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import CalendarClient from './CalendarClient'
 import TestWhatsApp from './TestWhatsApp'
 import GoogleStatus from './GoogleStatus'
+import WipeButton from './WipeButton'
 
 export default async function CalendarPage() {
   const supabase = createClient()
@@ -41,6 +41,7 @@ export default async function CalendarPage() {
       {/* Integration status / tests */}
       <TestWhatsApp />
       <GoogleStatus />
+      <WipeButton />
 
       {/* Page header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
