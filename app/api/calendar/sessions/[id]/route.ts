@@ -4,101 +4,104 @@ import { NextResponse } from 'next/server'
 import { deleteCalendarEvent, updateCalendarEventTime } from '@/lib/calendar/google'
 
 export const runtime = 'nodejs'
+export const maxDuration = 120
 
-// PATCH — update a session (cancel, mark no-show, or reschedule to a new time)
+// Collect the sessions a scoped operation targets (one / future / all in a series)
+async function targetSessions(supabase: any, base: any, scope: string) {
+  if (scope === 'one' || !base.recurring_rule_id) {
+    return [base]
+  }
+  let q = supabase.from('calendar_sessions').select('*').eq('recurring_rule_id', base.recurring_rule_id)
+  if (scope === 'future') q = q.gte('start_at', base.start_at)
+  const { data } = await q
+  return data ?? [base]
+}
+
+// PATCH — cancel / reschedule (single, or scoped across a recurring series)
 export async function PATCH(req: Request, { params }: { params: { id: string } }) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
-  const { status, start_at, end_at, duration_minutes, notes } = body
+  const { status, start_at, end_at, duration_minutes, notes, scope = 'one' } = body
 
-  const { data: existing } = await supabase
-    .from('calendar_sessions')
-    .select('*')
-    .eq('id', params.id)
-    .single()
+  const { data: existing } = await supabase.from('calendar_sessions').select('*').eq('id', params.id).single()
   if (!existing) return NextResponse.json({ error: 'Session not found' }, { status: 404 })
 
   const isReschedule = !!start_at && start_at !== existing.start_at
 
-  const update: Record<string, any> = { updated_by: user.id, updated_at: new Date().toISOString() }
-  if (status)    update.status   = status
-  if (start_at)  update.start_at = start_at
-  if (end_at)    update.end_at   = end_at
-  if (duration_minutes) update.duration_minutes = duration_minutes
-  if (notes !== undefined) update.notes = notes
-
-  // On reschedule: keep it active, and reset reminders so they fire for the new time
+  // Reschedule only ever affects the single occurrence
   if (isReschedule) {
-    update.status            = 'scheduled'
-    update.reminder_24h_sent = false
-    update.reminder_12h_sent = false
-    update.reminder_1h_sent  = false
+    const update: Record<string, any> = {
+      status: 'scheduled', start_at, end_at, updated_by: user.id, updated_at: new Date().toISOString(),
+      reminder_24h_sent: false, reminder_12h_sent: false, reminder_1h_sent: false,
+    }
+    if (duration_minutes) update.duration_minutes = duration_minutes
+    if (notes !== undefined) update.notes = notes
+    const { data, error } = await supabase.from('calendar_sessions').update(update).eq('id', params.id).select().single()
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+    if (existing.google_event_id) {
+      try { await updateCalendarEventTime(existing.google_event_id, start_at, end_at, 'Africa/Cairo') }
+      catch (e: any) { console.error('[Calendar] Google reschedule failed:', e?.message) }
+    }
+    await supabase.from('calendar_audit_log').insert({ event_id: params.id, action: 'rescheduled', performed_by: user.id, old_data: existing, new_data: data, source: 'crm' })
+    return NextResponse.json(data)
   }
 
-  const { data, error } = await supabase
-    .from('calendar_sessions')
-    .update(update)
-    .eq('id', params.id)
-    .select()
-    .single()
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-
-  // Sync the change to Google Calendar (notifies attendees)
-  if (existing.google_event_id) {
-    try {
-      if (status === 'cancelled') {
-        await deleteCalendarEvent(existing.google_event_id)
-      } else if (isReschedule) {
-        await updateCalendarEventTime(existing.google_event_id, start_at, end_at, 'Africa/Cairo')
+  // Cancel (optionally scoped across the recurring series)
+  if (status === 'cancelled') {
+    const rows = await targetSessions(supabase, existing, scope)
+    for (const r of rows) {
+      if (r.google_event_id) {
+        try { await deleteCalendarEvent(r.google_event_id) } catch (e: any) { console.error('[Calendar] cancel sync:', e?.message) }
       }
-    } catch (e: any) { console.error('[Calendar] Google sync failed:', e?.message) }
+    }
+    const ids = rows.map((r: any) => r.id)
+    await supabase.from('calendar_sessions').update({ status: 'cancelled', updated_by: user.id, updated_at: new Date().toISOString() }).in('id', ids)
+    // Stop a recurring series from generating more when cancelling future/all
+    if (existing.recurring_rule_id && scope !== 'one') {
+      await supabase.from('recurring_rules').update({ is_active: false }).eq('id', existing.recurring_rule_id)
+    }
+    await supabase.from('calendar_audit_log').insert({ event_id: params.id, action: 'cancelled', performed_by: user.id, old_data: existing, source: 'crm' })
+    return NextResponse.json({ ok: true, affected: ids.length })
   }
 
-  await supabase.from('calendar_audit_log').insert({
-    event_id:     params.id,
-    action:       status === 'cancelled' ? 'cancelled' : isReschedule ? 'rescheduled' : 'updated',
-    performed_by: user.id,
-    old_data:     existing,
-    new_data:     data,
-    source:       'crm',
-  })
-
+  // Plain field update (notes / status other than cancel)
+  const update: Record<string, any> = { updated_by: user.id, updated_at: new Date().toISOString() }
+  if (status) update.status = status
+  if (notes !== undefined) update.notes = notes
+  const { data, error } = await supabase.from('calendar_sessions').update(update).eq('id', params.id).select().single()
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
   return NextResponse.json(data)
 }
 
-// DELETE — permanently remove a session
-export async function DELETE(_req: Request, { params }: { params: { id: string } }) {
+// DELETE — permanently remove (single, or scoped across a recurring series)
+export async function DELETE(req: Request, { params }: { params: { id: string } }) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data: existing } = await supabase
-    .from('calendar_sessions')
-    .select('*')
-    .eq('id', params.id)
-    .single()
+  const scope = new URL(req.url).searchParams.get('scope') ?? 'one'
+
+  const { data: existing } = await supabase.from('calendar_sessions').select('*').eq('id', params.id).single()
   if (!existing) return NextResponse.json({ error: 'Session not found' }, { status: 404 })
 
-  // Remove Google Calendar event first (notifies attendees)
-  if (existing.google_event_id) {
-    try { await deleteCalendarEvent(existing.google_event_id) }
-    catch (e: any) { console.error('[Calendar] Google delete failed:', e?.message) }
+  const rows = await targetSessions(supabase, existing, scope)
+  for (const r of rows) {
+    if (r.google_event_id) {
+      try { await deleteCalendarEvent(r.google_event_id) } catch (e: any) { console.error('[Calendar] delete sync:', e?.message) }
+    }
   }
-
-  const { error } = await supabase.from('calendar_sessions').delete().eq('id', params.id)
+  const ids = rows.map((r: any) => r.id)
+  const { error } = await supabase.from('calendar_sessions').delete().in('id', ids)
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 
-  await supabase.from('calendar_audit_log').insert({
-    event_id:     params.id,
-    action:       'deleted',
-    performed_by: user.id,
-    old_data:     existing,
-    source:       'crm',
-  })
+  // Stop a recurring series from generating more when deleting future/all
+  if (existing.recurring_rule_id && scope !== 'one') {
+    await supabase.from('recurring_rules').update({ is_active: false }).eq('id', existing.recurring_rule_id)
+  }
 
-  return NextResponse.json({ ok: true })
+  await supabase.from('calendar_audit_log').insert({ event_id: params.id, action: 'deleted', performed_by: user.id, old_data: existing, source: 'crm' })
+  return NextResponse.json({ ok: true, affected: ids.length })
 }

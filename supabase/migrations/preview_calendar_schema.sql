@@ -35,6 +35,7 @@ create table if not exists recurring_rules (
   start_time       time not null,
   duration_minutes int not null default 60,
   timezone         text not null default 'Africa/Cairo',
+  until_date       date,                     -- null = never-ending (rolling generation)
   is_active        boolean default true,
   notes            text,
   created_by       uuid references profiles(id),

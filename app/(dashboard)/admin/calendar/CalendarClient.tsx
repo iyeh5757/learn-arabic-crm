@@ -35,7 +35,7 @@ const EMPTY_FORM = {
   student_name: '', student_email: '', student_phone: '',
   date: '', start_time: '', duration_minutes: 60,
   notes: '', recurring: false,
-  days: [] as number[], weeks: 8,
+  days: [] as number[], weeks: 8, never_end: false,
   force: false, force_reason: '',
   open_access: true, auto_record: false,
 }
@@ -200,6 +200,7 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
           duration_minutes: form.duration_minutes,
           days_of_week:    form.days,
           weeks:           form.weeks,
+          never_end:       form.never_end,
           notes:           form.notes,
           open_access:     form.open_access,
           auto_record:     form.auto_record,
@@ -294,24 +295,24 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
     }
   }
 
-  async function cancelSession() {
+  async function cancelSession(scope: 'one' | 'future' | 'all' = 'one') {
     if (!selected) return
-    if (!confirm('Cancel this session? The student and teacher will be notified and the Meet event removed.')) return
+    if (scope === 'one' && !confirm('Cancel this session? The student and teacher will be notified and the Meet event removed.')) return
     setBusy(true)
     const res = await fetch(`/api/calendar/sessions/${selected.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: 'cancelled' }),
+      body: JSON.stringify({ status: 'cancelled', scope }),
     })
     setBusy(false)
     if (res.ok) { setSelected(null); refresh() }
     else alert('Failed to cancel session')
   }
 
-  async function deleteSession() {
+  async function deleteSession(scope: 'one' | 'future' | 'all' = 'one') {
     if (!selected) return
-    if (!confirm('Permanently delete this session? This cannot be undone.')) return
+    if (scope === 'one' && !confirm('Permanently delete this session? This cannot be undone.')) return
     setBusy(true)
-    const res = await fetch(`/api/calendar/sessions/${selected.id}`, { method: 'DELETE' })
+    const res = await fetch(`/api/calendar/sessions/${selected.id}?scope=${scope}`, { method: 'DELETE' })
     setBusy(false)
     if (res.ok) { setSelected(null); refresh() }
     else alert('Failed to delete session')
@@ -512,26 +513,55 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
                   style={{ width: '100%', padding: '9px', background: '#E0E7FF', color: '#3730A3', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
                   🕑 Reschedule
                 </button>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button onClick={cancelSession} disabled={busy}
-                    style={{ flex: 1, padding: '9px', background: '#FEF3C7', color: '#92400E', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
-                    Cancel Session
-                  </button>
-                  {canDelete && (
-                    <button onClick={deleteSession} disabled={busy}
-                      style={{ flex: 1, padding: '9px', background: '#FEE2E2', color: '#B91C1C', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
-                      Delete
+
+                {selected.recurring_rule_id ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px solid #F1F5F9', paddingTop: '10px' }}>
+                    <div style={{ fontSize: '11px', color: '#8B5CF6', fontWeight: '700' }}>🔁 Recurring session — apply to:</div>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button onClick={() => cancelSession('one')} disabled={busy}
+                        style={{ flex: 1, padding: '8px', background: '#FEF3C7', color: '#92400E', border: 'none', borderRadius: '9px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>Cancel this</button>
+                      <button onClick={() => cancelSession('future')} disabled={busy}
+                        style={{ flex: 1, padding: '8px', background: '#FEF3C7', color: '#92400E', border: 'none', borderRadius: '9px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>Cancel this & future</button>
+                    </div>
+                    {canDelete && (
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <button onClick={() => deleteSession('one')} disabled={busy}
+                          style={{ flex: 1, padding: '8px', background: '#FEE2E2', color: '#B91C1C', border: 'none', borderRadius: '9px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>Delete this</button>
+                        <button onClick={() => deleteSession('future')} disabled={busy}
+                          style={{ flex: 1, padding: '8px', background: '#FEE2E2', color: '#B91C1C', border: 'none', borderRadius: '9px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>Delete this & future</button>
+                        <button onClick={() => deleteSession('all')} disabled={busy}
+                          style={{ flex: 1, padding: '8px', background: '#B91C1C', color: '#fff', border: 'none', borderRadius: '9px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>Delete all</button>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button onClick={() => cancelSession('one')} disabled={busy}
+                      style={{ flex: 1, padding: '9px', background: '#FEF3C7', color: '#92400E', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
+                      Cancel Session
                     </button>
-                  )}
-                </div>
+                    {canDelete && (
+                      <button onClick={() => deleteSession('one')} disabled={busy}
+                        style={{ flex: 1, padding: '9px', background: '#FEE2E2', color: '#B91C1C', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
+                        Delete
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             )}
             {selected.status === 'cancelled' && canDelete && (
-              <div style={{ padding: '0 22px 20px' }}>
-                <button onClick={deleteSession} disabled={busy}
-                  style={{ width: '100%', padding: '9px', background: '#FEE2E2', color: '#B91C1C', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
+              <div style={{ padding: '0 22px 20px', display: 'flex', gap: '8px' }}>
+                <button onClick={() => deleteSession('one')} disabled={busy}
+                  style={{ flex: 1, padding: '9px', background: '#FEE2E2', color: '#B91C1C', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
                   Delete Permanently
                 </button>
+                {selected.recurring_rule_id && (
+                  <button onClick={() => deleteSession('all')} disabled={busy}
+                    style={{ flex: 1, padding: '9px', background: '#B91C1C', color: '#fff', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
+                    Delete all in series
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -647,13 +677,24 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
                         </button>
                       ))}
                     </div>
-                    <label style={{ fontSize: '12px', color: '#475569', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      Repeat for
-                      <input type="number" min={1} max={26} value={form.weeks}
-                        onChange={e => setForm(f => ({ ...f, weeks: Math.max(1, Math.min(26, Number(e.target.value) || 1)) }))}
-                        style={{ width: '64px', padding: '6px 8px', border: '1px solid #E2E8F0', borderRadius: '8px', fontSize: '13px' }} />
-                      weeks
-                    </label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                      <button type="button" onClick={() => setForm(f => ({ ...f, never_end: !f.never_end }))}
+                        style={{ width: '42px', height: '24px', borderRadius: '12px', background: form.never_end ? '#0D1B2A' : '#CBD5E1', border: 'none', cursor: 'pointer', position: 'relative', flexShrink: 0, transition: 'background 0.2s' }}>
+                        <span style={{ position: 'absolute', width: '18px', height: '18px', borderRadius: '50%', background: '#fff', top: '3px', left: form.never_end ? '21px' : '3px', transition: 'left 0.2s' }} />
+                      </button>
+                      <span style={{ fontSize: '13px', fontWeight: '600', color: '#334155' }}>♾️ Never ends</span>
+                    </div>
+                    {!form.never_end ? (
+                      <label style={{ fontSize: '12px', color: '#475569', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        Repeat for
+                        <input type="number" min={1} max={52} value={form.weeks}
+                          onChange={e => setForm(f => ({ ...f, weeks: Math.max(1, Math.min(52, Number(e.target.value) || 1)) }))}
+                          style={{ width: '64px', padding: '6px 8px', border: '1px solid #E2E8F0', borderRadius: '8px', fontSize: '13px' }} />
+                        weeks
+                      </label>
+                    ) : (
+                      <div style={{ fontSize: '12px', color: '#94A3B8' }}>Repeats indefinitely — sessions are auto-extended weekly until you cancel the series.</div>
+                    )}
                   </div>
                 )}
               </div>

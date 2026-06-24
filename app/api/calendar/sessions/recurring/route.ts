@@ -37,7 +37,7 @@ export async function POST(req: Request) {
   const b = await req.json()
   const {
     session_type_id, teacher_id, student_id, student_name, student_email, student_phone,
-    start_date, start_time, duration_minutes, days_of_week, weeks = 8, notes,
+    start_date, start_time, duration_minutes, days_of_week, weeks = 8, never_end = false, notes,
     open_access, auto_record,
   } = b
 
@@ -45,11 +45,23 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Missing required fields for recurring booking' }, { status: 400 })
   }
 
-  // Compute occurrence dates (Cairo) for selected weekdays over N weeks, future only
+  // Book up to an 8-week initial horizon now; the hourly cron extends active
+  // series further (so "never ends" keeps rolling, and long fixed series fill in).
+  const INITIAL_WEEKS = 8
+  const genWeeks = never_end ? INITIAL_WEEKS : Math.min(weeks, INITIAL_WEEKS)
+
+  // until_date: null = never-ending; otherwise start_date + weeks
+  let untilDate: string | null = null
+  if (!never_end) {
+    const u = new Date(start_date + 'T00:00:00'); u.setDate(u.getDate() + weeks * 7)
+    untilDate = `${u.getFullYear()}-${String(u.getMonth() + 1).padStart(2, '0')}-${String(u.getDate()).padStart(2, '0')}`
+  }
+
+  // Compute occurrence dates (Cairo) for selected weekdays over the initial horizon
   const [by, bm, bd] = start_date.split('-').map(Number)
   const occurrences: { startIso: string; endIso: string }[] = []
   const now = Date.now()
-  for (let n = 0; n < weeks * 7 && occurrences.length < MAX_OCCURRENCES; n++) {
+  for (let n = 0; n < genWeeks * 7 && occurrences.length < MAX_OCCURRENCES; n++) {
     const day = new Date(by, bm - 1, bd + n)
     if (!days_of_week.includes(day.getDay())) continue
     const ds = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`
@@ -62,7 +74,7 @@ export async function POST(req: Request) {
   // Create the rule
   const { data: rule } = await supabase.from('recurring_rules').insert({
     teacher_id, student_id: student_id || null, session_type_id: session_type_id || null,
-    days_of_week, start_time: start_time + ':00', duration_minutes, created_by: user.id,
+    days_of_week, start_time: start_time + ':00', duration_minutes, until_date: untilDate, created_by: user.id,
   }).select().single()
 
   // Look up teacher email + type name + one shared Meet link for the whole series

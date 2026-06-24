@@ -5,9 +5,10 @@
 import { NextResponse } from 'next/server'
 import { processSessionReminders } from '@/lib/calendar/reminders'
 import { syncFromGoogle } from '@/lib/calendar/sync'
+import { topUpRecurringRules } from '@/lib/calendar/recurring'
 
 export const runtime = 'nodejs'
-export const maxDuration = 60
+export const maxDuration = 300
 
 export async function GET(req: Request) {
   // Accept either Vercel Cron's auth header or a ?secret= query param (for external crons)
@@ -25,9 +26,12 @@ export async function GET(req: Request) {
     let googleSync: any = { skipped: 'google not configured' }
     try { googleSync = await syncFromGoogle() }
     catch (e: any) { googleSync = { error: e?.message } }
+    let recurring: any = {}
+    try { recurring = await topUpRecurringRules() }
+    catch (e: any) { recurring = { error: e?.message } }
 
-    console.log('[Cron] Done:', { reminders, googleSync })
-    return NextResponse.json({ ok: true, reminders, googleSync })
+    console.log('[Cron] Done:', { reminders, googleSync, recurring })
+    return NextResponse.json({ ok: true, reminders, googleSync, recurring })
   } catch (err: any) {
     console.error('[Cron] Fatal error:', err?.message)
     return NextResponse.json({ ok: false, error: err?.message }, { status: 500 })
