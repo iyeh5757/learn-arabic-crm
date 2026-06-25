@@ -37,6 +37,7 @@ const NAV: Record<string, { label: string; href: string; emoji: string }[]> = {
     { label: 'Payments',    href: '/sales/payments',    emoji: '💳' },
     { label: 'Commissions', href: '/sales/commissions', emoji: '💰' },
     { label: 'Calendar',    href: '/sales/calendar',    emoji: '🗓️' },
+    { label: 'Availability', href: '/sales/calendar/availability', emoji: '🔍' },
     { label: 'My Leads',    href: '/sales/leads',       emoji: '📋' },
   ],
   accountant: [
@@ -50,6 +51,7 @@ const NAV: Record<string, { label: string; href: string; emoji: string }[]> = {
     { label: 'Dashboard', href: '/supervisor',           emoji: '📊' },
     { label: 'Sessions',  href: '/supervisor/sessions',  emoji: '📅' },
     { label: 'Team Calendar', href: '/supervisor/calendar', emoji: '🗓️' },
+    { label: 'Availability', href: '/supervisor/calendar/availability', emoji: '🔍' },
     { label: 'Teachers',  href: '/supervisor/teachers',  emoji: '👩‍🏫' },
     { label: 'Trials',    href: '/supervisor/trials',    emoji: '🎯' },
     { label: 'Reminders', href: '/supervisor/reminders', emoji: '🔔' },
