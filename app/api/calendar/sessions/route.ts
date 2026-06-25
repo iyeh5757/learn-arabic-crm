@@ -16,6 +16,14 @@ export async function GET(req: Request) {
   const start        = searchParams.get('start')
   const end          = searchParams.get('end')
   const status       = searchParams.get('status')
+  const mine         = searchParams.get('mine')   // only sessions I created
+
+  let myId: string | null = null
+  if (mine) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json([])
+    myId = user.id
+  }
 
   // Supervisor filter → expand to all teachers assigned to that supervisor
   let teacherIdsForSupervisor: string[] | null = null
@@ -39,6 +47,7 @@ export async function GET(req: Request) {
 
   if (teacherId)               query = query.eq('teacher_id', teacherId)
   if (teacherIdsForSupervisor) query = query.in('teacher_id', teacherIdsForSupervisor)
+  if (myId)                    query = query.eq('created_by', myId)
   if (start)                   query = query.gte('start_at', start)
   if (end)                     query = query.lte('start_at', end)
   if (status)                  query = query.eq('status', status)

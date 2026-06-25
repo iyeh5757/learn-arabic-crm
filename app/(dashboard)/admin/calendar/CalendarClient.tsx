@@ -28,6 +28,8 @@ interface Props {
   students: Student[]
   canDelete?: boolean            // hard-delete allowed (admin only)
   showSupervisorFilter?: boolean // show the supervisor filter dropdown
+  mineOnly?: boolean             // only show sessions I booked
+  showBlocks?: boolean           // overlay teachers' blocked time (default true)
 }
 
 const EMPTY_FORM = {
@@ -63,7 +65,7 @@ function cairoToUtc(dateStr: string, timeStr: string): Date {
   return new Date(guess.getTime() - offset * 60000)
 }
 
-export default function CalendarClient({ sessionTypes, teachers, supervisors, students, canDelete = true, showSupervisorFilter = true }: Props) {
+export default function CalendarClient({ sessionTypes, teachers, supervisors, students, canDelete = true, showSupervisorFilter = true, mineOnly = false, showBlocks = true }: Props) {
   const calRef = useRef<any>(null)
   const [filterTeacher, setFilterTeacher]       = useState('')
   const [filterSupervisor, setFilterSupervisor] = useState('')
@@ -87,10 +89,11 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
       const params: Record<string, string> = { start: fetchInfo.startStr, end: fetchInfo.endStr }
       if (filterTeacherRef.current)    params.teacher_id    = filterTeacherRef.current
       if (filterSupervisorRef.current) params.supervisor_id = filterSupervisorRef.current
+      if (mineOnly)                    params.mine = '1'
       const qs = new URLSearchParams(params).toString()
       const [res, bRes] = await Promise.all([
         fetch(`/api/calendar/sessions?${qs}`),
-        fetch(`/api/calendar/blocks?${qs}`),
+        showBlocks ? fetch(`/api/calendar/blocks?${qs}`) : Promise.resolve(null),
       ])
       const data = await res.json()
       if (!res.ok) {
@@ -116,8 +119,8 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
 
       // Blocked (unavailable) time — shown grey so schedulers can see availability
       let blockEvents: any[] = []
-      const blocks = await bRes.json().catch(() => [])
-      if (bRes.ok && Array.isArray(blocks)) {
+      const blocks = bRes ? await bRes.json().catch(() => []) : []
+      if (bRes && bRes.ok && Array.isArray(blocks)) {
         const teacherName = (id: string) => teachers.find(t => t.id === id)?.name ?? ''
         blockEvents = blocks.map((b: any) => ({
           id:    `block-${b.id}`,
