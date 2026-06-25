@@ -28,8 +28,6 @@ interface Props {
   students: Student[]
   canDelete?: boolean            // hard-delete allowed (admin only)
   showSupervisorFilter?: boolean // show the supervisor filter dropdown
-  mineOnly?: boolean             // only show sessions I booked
-  showBlocks?: boolean           // overlay teachers' blocked time (default true)
 }
 
 const EMPTY_FORM = {
@@ -65,10 +63,11 @@ function cairoToUtc(dateStr: string, timeStr: string): Date {
   return new Date(guess.getTime() - offset * 60000)
 }
 
-export default function CalendarClient({ sessionTypes, teachers, supervisors, students, canDelete = true, showSupervisorFilter = true, mineOnly = false, showBlocks = true }: Props) {
+export default function CalendarClient({ sessionTypes, teachers, supervisors, students, canDelete = true, showSupervisorFilter = true }: Props) {
   const calRef = useRef<any>(null)
   const [filterTeacher, setFilterTeacher]       = useState('')
   const [filterSupervisor, setFilterSupervisor] = useState('')
+  const [mineFilter, setMineFilter] = useState(false)
   const [form, setForm]     = useState({ ...EMPTY_FORM })
   const [modal, setModal]   = useState(false)
   const [conflict, setConflict] = useState(false)
@@ -83,17 +82,19 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
   const [resched, setResched] = useState<null | { date: string; time: string; duration: number }>(null)
   const filterTeacherRef    = useRef('')
   const filterSupervisorRef = useRef('')
+  const mineRef             = useRef(false)
 
   const loadEvents = useCallback(async (fetchInfo: any, successCb: any, failureCb: any) => {
     try {
       const params: Record<string, string> = { start: fetchInfo.startStr, end: fetchInfo.endStr }
       if (filterTeacherRef.current)    params.teacher_id    = filterTeacherRef.current
       if (filterSupervisorRef.current) params.supervisor_id = filterSupervisorRef.current
-      if (mineOnly)                    params.mine = '1'
+      if (mineRef.current)             params.mine = '1'
       const qs = new URLSearchParams(params).toString()
+      // When showing only my bookings, hide teachers' blocked time
       const [res, bRes] = await Promise.all([
         fetch(`/api/calendar/sessions?${qs}`),
-        showBlocks ? fetch(`/api/calendar/blocks?${qs}`) : Promise.resolve(null),
+        mineRef.current ? Promise.resolve(null) : fetch(`/api/calendar/blocks?${qs}`),
       ])
       const data = await res.json()
       if (!res.ok) {
@@ -153,9 +154,14 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
     filterSupervisorRef.current = id; filterTeacherRef.current = ''
     refresh()
   }
+  function toggleMine() {
+    const next = !mineFilter
+    setMineFilter(next); mineRef.current = next
+    refresh()
+  }
   function clearFilters() {
-    setFilterTeacher(''); setFilterSupervisor('')
-    filterTeacherRef.current = ''; filterSupervisorRef.current = ''
+    setFilterTeacher(''); setFilterSupervisor(''); setMineFilter(false)
+    filterTeacherRef.current = ''; filterSupervisorRef.current = ''; mineRef.current = false
     refresh()
   }
 
@@ -401,7 +407,11 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
           </select>
         </div>
         )}
-        {(filterTeacher || filterSupervisor) && (
+        <button onClick={toggleMine}
+          style={{ padding: '7px 14px', borderRadius: '9px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', border: '1.5px solid', borderColor: mineFilter ? '#0D1B2A' : '#E2E8F0', background: mineFilter ? '#0D1B2A' : '#fff', color: mineFilter ? '#E8C97A' : '#334155' }}>
+          🙋 My bookings
+        </button>
+        {(filterTeacher || filterSupervisor || mineFilter) && (
           <button onClick={clearFilters}
             style={{ padding: '6px 12px', background: '#F1F5F9', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '600', cursor: 'pointer', color: '#475569' }}>
             ✕ Clear
