@@ -1,6 +1,7 @@
 // app/(dashboard)/admin/reminders/page.tsx
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
+import { MarkInactiveButton, ReactivateButton } from './RetentionActions'
 
 export default async function AdminRemindersPage() {
   const supabase = createClient()
@@ -23,6 +24,12 @@ export default async function AdminRemindersPage() {
     .from('students')
     .select('id, name, phone, email, reminder_date, notes, currency, assigned_teacher:teachers(profile:profiles!teachers_user_id_fkey(name))')
     .eq('reminder_date', today)
+
+  const { data: inactiveStudents } = await supabase
+    .from('students')
+    .select('id, name, phone, email, country, recontact_date, inactive_reason, assigned_teacher:teachers(profile:profiles!teachers_user_id_fkey(name)), added_by_sales:profiles!students_added_by_sales_id_fkey(name)')
+    .eq('student_status', 'inactive')
+    .order('recontact_date', { ascending: true, nullsFirst: false })
 
   const outOfClasses = (lowStudents ?? []).filter(s => (s.total_paid_classes - s.consumed_classes) <= 0)
   const oneLast = (lowStudents ?? []).filter(s => (s.total_paid_classes - s.consumed_classes) === 1)
@@ -48,6 +55,7 @@ export default async function AdminRemindersPage() {
           <div style={{ display: 'flex', gap: '8px' }}>
             <Link href={`/admin/students/${s.id}/edit`} style={{ background: '#0D1B2A', color: '#E8C97A', padding: '5px 12px', borderRadius: '6px', textDecoration: 'none', fontSize: '12px', fontWeight: '600' }}>Edit</Link>
             <Link href={`/admin/payments/new?student_id=${s.id}&student_name=${encodeURIComponent(s.name)}`} style={{ background: '#059669', color: '#fff', padding: '5px 12px', borderRadius: '6px', textDecoration: 'none', fontSize: '12px', fontWeight: '600' }}>+ Pay</Link>
+            <MarkInactiveButton studentId={s.id} name={s.name} />
           </div>
         </td>
       </tr>
@@ -198,6 +206,56 @@ export default async function AdminRemindersPage() {
           <p style={{ fontSize: '18px', fontWeight: '600', color: '#374151', margin: 0 }}>All clear! No reminders today.</p>
         </div>
       )}
+
+      {/* Inactive students — retention follow-up list */}
+      <div style={{ background: '#fff', borderRadius: '16px', border: '1px solid #E5E7EB', overflow: 'hidden', marginTop: '8px' }}>
+        <div style={{ background: '#475569', padding: '14px 18px' }}>
+          <span style={{ color: '#fff', fontWeight: '700', fontSize: '15px' }}>💤 Inactive Students ({(inactiveStudents ?? []).length})</span>
+          <span style={{ color: '#CBD5E1', fontSize: '12px', marginLeft: '8px' }}>On hold — follow up on their recontact date</span>
+        </div>
+        {(inactiveStudents ?? []).length === 0 ? (
+          <div style={{ padding: '20px', color: '#9CA3AF', fontSize: '14px', textAlign: 'center' }}>No inactive students.</div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: '#F8FAFC' }}>
+                  {['Student', 'Recontact Date', 'Comment', 'Teacher', 'Sales', 'Phone', ''].map(h => (
+                    <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: '11px', fontWeight: '700', color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {(inactiveStudents ?? []).map((s: any) => {
+                  const due = s.recontact_date && s.recontact_date <= today
+                  return (
+                    <tr key={s.id} style={{ borderBottom: '1px solid #F3F4F6', background: due ? '#FFFBEB' : '#fff' }}>
+                      <td style={{ padding: '12px 14px' }}>
+                        <p style={{ fontWeight: '600', color: '#111827', margin: 0, fontSize: '14px' }}>{s.name}</p>
+                        {s.email && <p style={{ color: '#9CA3AF', fontSize: '11px', margin: '2px 0 0' }}>{s.email}</p>}
+                      </td>
+                      <td style={{ padding: '12px 14px', fontSize: '13px', fontWeight: due ? 700 : 400, color: due ? '#B45309' : '#374151' }}>
+                        {s.recontact_date ? new Date(s.recontact_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                        {due && ' ⚠️'}
+                      </td>
+                      <td style={{ padding: '12px 14px', fontSize: '13px', color: '#475569', maxWidth: '280px' }}>{s.inactive_reason || '—'}</td>
+                      <td style={{ padding: '12px 14px', fontSize: '13px', color: '#374151' }}>{(s.assigned_teacher as any)?.profile?.name ?? '—'}</td>
+                      <td style={{ padding: '12px 14px', fontSize: '13px', color: '#374151' }}>{(s.added_by_sales as any)?.name ?? '—'}</td>
+                      <td style={{ padding: '12px 14px', fontSize: '13px', color: '#6B7280' }}>{s.phone ?? '—'}</td>
+                      <td style={{ padding: '12px 14px' }}>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <Link href={`/admin/students/${s.id}/edit`} style={{ background: '#0D1B2A', color: '#E8C97A', padding: '5px 12px', borderRadius: '6px', textDecoration: 'none', fontSize: '12px', fontWeight: '600' }}>Edit</Link>
+                          <ReactivateButton studentId={s.id} />
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
