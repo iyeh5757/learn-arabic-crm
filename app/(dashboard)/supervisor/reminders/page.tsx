@@ -1,6 +1,7 @@
 // app/(dashboard)/supervisor/reminders/page.tsx
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
+import { MarkInactiveButton, ReactivateButton, FollowupsButton } from '../../admin/reminders/RetentionActions'
 
 export default async function SupervisorRemindersPage() {
   const supabase = createClient()
@@ -47,6 +48,13 @@ export default async function SupervisorRemindersPage() {
       .order('created_at', { ascending: false }),
   ])
 
+  const { data: inactiveStudents } = await supabase
+    .from('students')
+    .select('id, name, phone, email, recontact_date, inactive_reason, assigned_teacher:teachers(profile:profiles!teachers_user_id_fkey(name))')
+    .in('id', studentIds)
+    .eq('student_status', 'inactive')
+    .order('recontact_date', { ascending: true, nullsFirst: false })
+
   const outOfClasses = (lowStudents ?? []).filter(s => (s.remaining_classes ?? 0) <= 0)
   const oneLast      = (lowStudents ?? []).filter(s => s.remaining_classes === 1)
   const twoLeft      = (lowStudents ?? []).filter(s => s.remaining_classes === 2)
@@ -79,6 +87,7 @@ export default async function SupervisorRemindersPage() {
                     <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' as const }}>
                       <Link href={`/supervisor/students/${s.id}/edit`} style={{ background: '#0D1B2A', color: '#E8C97A', padding: '5px 12px', borderRadius: '6px', textDecoration: 'none', fontSize: '12px', fontWeight: '600' }}>Edit</Link>
                       <Link href={`/supervisor/payments/new?student_id=${s.id}&student_name=${encodeURIComponent(s.name)}`} style={{ background: '#059669', color: '#fff', padding: '5px 12px', borderRadius: '6px', textDecoration: 'none', fontSize: '12px', fontWeight: '600' }}>+ Pay</Link>
+                      <MarkInactiveButton studentId={s.id} name={s.name} />
                     </div>
                   </td>
                 )}
@@ -166,6 +175,51 @@ export default async function SupervisorRemindersPage() {
           </div>
         </div>
       )}
+
+      {/* Inactive students — retention follow-up list */}
+      <div style={cardStyle}>
+        <div style={hdrStyle('#475569')}>
+          <span style={{ color: '#fff', fontWeight: '700', fontSize: '15px' }}>💤 Inactive Students ({(inactiveStudents ?? []).length})</span>
+        </div>
+        {(inactiveStudents ?? []).length === 0 ? (
+          <p style={{ padding: '20px', color: '#9CA3AF', textAlign: 'center' }}>No inactive students.</p>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr style={{ background: '#F9FAFB' }}>
+                  {['Student', 'Recontact Date', 'Comment', 'Teacher', 'Phone', 'Actions'].map(h => (
+                    <th key={h} style={{ ...cell, fontWeight: '600', color: '#6B7280', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {(inactiveStudents ?? []).map((s: any) => {
+                  const due = s.recontact_date && s.recontact_date <= today
+                  return (
+                    <tr key={s.id} style={{ background: due ? '#FFFBEB' : '#fff' }}>
+                      <td style={{ ...cell, fontWeight: '600', color: '#111827' }}>{s.name}</td>
+                      <td style={{ ...cell, fontWeight: due ? 700 : 400, color: due ? '#B45309' : '#374151' }}>
+                        {s.recontact_date ? new Date(s.recontact_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}{due && ' ⚠️'}
+                      </td>
+                      <td style={{ ...cell, maxWidth: '260px' }}>{s.inactive_reason || '—'}</td>
+                      <td style={cell}>{(s.assigned_teacher as any)?.profile?.name ?? '—'}</td>
+                      <td style={cell}>{s.phone ?? '—'}</td>
+                      <td style={cell}>
+                        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                          <FollowupsButton studentId={s.id} name={s.name} />
+                          <Link href={`/supervisor/students/${s.id}/edit`} style={{ background: '#0D1B2A', color: '#E8C97A', padding: '5px 12px', borderRadius: '6px', textDecoration: 'none', fontSize: '12px', fontWeight: '600' }}>Edit</Link>
+                          <ReactivateButton studentId={s.id} />
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

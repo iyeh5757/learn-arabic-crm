@@ -1,7 +1,7 @@
 // app/(dashboard)/admin/reminders/page.tsx
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
-import { MarkInactiveButton, ReactivateButton } from './RetentionActions'
+import { MarkInactiveButton, ReactivateButton, FollowupsButton } from './RetentionActions'
 
 export default async function AdminRemindersPage() {
   const supabase = createClient()
@@ -244,6 +244,7 @@ export default async function AdminRemindersPage() {
                       <td style={{ padding: '12px 14px', fontSize: '13px', color: '#6B7280' }}>{s.phone ?? '—'}</td>
                       <td style={{ padding: '12px 14px' }}>
                         <div style={{ display: 'flex', gap: '6px' }}>
+                          <FollowupsButton studentId={s.id} name={s.name} />
                           <Link href={`/admin/students/${s.id}/edit`} style={{ background: '#0D1B2A', color: '#E8C97A', padding: '5px 12px', borderRadius: '6px', textDecoration: 'none', fontSize: '12px', fontWeight: '600' }}>Edit</Link>
                           <ReactivateButton studentId={s.id} />
                         </div>
