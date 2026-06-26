@@ -89,9 +89,8 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
       const params: Record<string, string> = { start: fetchInfo.startStr, end: fetchInfo.endStr }
       if (filterTeacherRef.current)    params.teacher_id    = filterTeacherRef.current
       if (filterSupervisorRef.current) params.supervisor_id = filterSupervisorRef.current
-      if (mineRef.current)             params.mine = '1'
       const qs = new URLSearchParams(params).toString()
-      // When showing only my bookings, hide teachers' blocked time
+      // "Bookings only" = show all booked sessions but hide teachers' blocked time
       const [res, bRes] = await Promise.all([
         fetch(`/api/calendar/sessions?${qs}`),
         mineRef.current ? Promise.resolve(null) : fetch(`/api/calendar/blocks?${qs}`),
@@ -408,8 +407,9 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
         </div>
         )}
         <button onClick={toggleMine}
-          style={{ padding: '7px 14px', borderRadius: '9px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', border: '1.5px solid', borderColor: mineFilter ? '#0D1B2A' : '#E2E8F0', background: mineFilter ? '#0D1B2A' : '#fff', color: mineFilter ? '#E8C97A' : '#334155' }}>
-          🙋 My bookings
+          style={{ padding: '7px 14px', borderRadius: '9px', fontSize: '13px', fontWeight: '700', cursor: 'pointer', border: '1.5px solid', borderColor: mineFilter ? '#0D1B2A' : '#E2E8F0', background: mineFilter ? '#0D1B2A' : '#fff', color: mineFilter ? '#E8C97A' : '#334155' }}
+          title="Show all booked classes and hide teachers' blocked time">
+          📚 Bookings only
         </button>
         {(filterTeacher || filterSupervisor || mineFilter) && (
           <button onClick={clearFilters}
