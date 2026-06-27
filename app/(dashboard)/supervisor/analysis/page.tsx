@@ -1,7 +1,7 @@
 // app/(dashboard)/supervisor/analysis/page.tsx
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { computeAnalytics } from '@/lib/analytics/supervisor'
+import { computeAnalytics, fetchUsdRates } from '@/lib/analytics/supervisor'
 import Filters from '../../admin/supervisor-analysis/Filters'
 import MetricsTable from '../../admin/supervisor-analysis/MetricsTable'
 
@@ -40,9 +40,10 @@ export default async function SupervisorOwnAnalysisPage({ searchParams }: { sear
   const supervisors = [{ id: user.id, name: profile?.name ?? 'My team' }]
   const filters = { month: searchParams?.month || null, supervisorId: user.id, teacherId: searchParams?.teacher || null }
 
+  const rates = await fetchUsdRates()
   const { supervisorRows, teacherRows: teacherMetrics } = computeAnalytics(
     { supervisors, teachers, students: (students ?? []) as any, payments: (pay ?? []) as any, sales: [] },
-    filters,
+    filters, rates,
   )
 
   return (

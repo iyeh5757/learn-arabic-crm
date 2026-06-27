@@ -43,7 +43,7 @@ export default function MetricsTable({
                 ) : (
                   <>
                     <th style={th}>Students</th>
-                    <th style={th}>Revenue (EGP)</th>
+                    <th style={th}>Revenue (USD)</th>
                   </>
                 )}
               </tr>
@@ -63,7 +63,7 @@ export default function MetricsTable({
                   ) : (
                     <>
                       <td style={td}>{r.students}</td>
-                      <td style={{ ...td, fontWeight: 700, color: '#059669' }}>{r.revenueEGP.toLocaleString()}</td>
+                      <td style={{ ...td, fontWeight: 700, color: '#059669' }}>${r.revenue.toLocaleString()}</td>
                     </>
                   )}
                 </tr>

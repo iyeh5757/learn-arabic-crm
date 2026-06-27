@@ -6,12 +6,31 @@
 //    "lost" unless that student has paid (payment_status = 'paid').
 //  - Renewal rate = students with a renewal payment / paying students
 //    ("completed first plan" is approximated as having paid at least once).
-//  - Money = sum of PAID payments, converted to EGP (approximate fixed rates).
+//  - Money = sum of PAID payments, converted to USD using live rates.
 //  - Month filter scopes students (by created_at) and payments (by created_at).
 
-const EGP_RATES: Record<string, number> = { USD: 50, GBP: 63.5, EUR: 54.5, AED: 13.6, EGP: 1 }
-export function toEGP(amount: number, currency: string): number {
-  return amount * (EGP_RATES[currency] ?? 1)
+// rates: units of currency per 1 USD (e.g. exchangerate-api base USD). So an
+// amount in currency X is X / rates[X] USD.
+export function toUSD(amount: number, currency: string, rates: Record<string, number>): number {
+  const r = rates[currency]
+  if (!r || r <= 0) return currency === 'USD' ? amount : 0
+  return amount / r
+}
+
+// Live USD-base exchange rates (units of currency per 1 USD), with a safe fallback.
+export async function fetchUsdRates(): Promise<Record<string, number>> {
+  const fallback = { USD: 1, GBP: 0.79, EUR: 0.92, AED: 3.67, EGP: 50 }
+  try {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 3000)
+    const r = await fetch('https://api.exchangerate-api.com/v4/latest/USD', { signal: controller.signal, next: { revalidate: 3600 } })
+    clearTimeout(timeout)
+    if (r.ok) {
+      const d = await r.json()
+      if (d?.rates) return { USD: 1, ...d.rates }
+    }
+  } catch { /* fall through */ }
+  return fallback
 }
 
 export type Teacher = { id: string; name: string; supervisor_id: string | null }
@@ -35,7 +54,7 @@ export interface MetricRow {
   payers: number
   renewed: number
   renewalRate: number       // %
-  revenueEGP: number
+  revenue: number           // USD
 }
 
 function inMonth(iso: string, month: string | null): boolean {
@@ -56,7 +75,7 @@ export interface AnalyticsFilters {
   teacherId?: string | null
 }
 
-export function computeAnalytics(input: AnalyticsInput, filters: AnalyticsFilters) {
+export function computeAnalytics(input: AnalyticsInput, filters: AnalyticsFilters, rates: Record<string, number>) {
   const { teachers, supervisors, sales } = input
   const month = filters.month ?? null
 
@@ -75,7 +94,7 @@ export function computeAnalytics(input: AnalyticsInput, filters: AnalyticsFilter
   const renewedStudentIds = new Set(payments.filter(p => p.is_renewal).map(p => p.student_id))
   const revenueByStudent = new Map<string, number>()
   for (const p of payments) {
-    revenueByStudent.set(p.student_id, (revenueByStudent.get(p.student_id) ?? 0) + toEGP(Number(p.amount) || 0, p.currency))
+    revenueByStudent.set(p.student_id, (revenueByStudent.get(p.student_id) ?? 0) + toUSD(Number(p.amount) || 0, p.currency, rates))
   }
 
   function rowForStudents(id: string, name: string, sList: Student[], teacherCount?: number): MetricRow {
@@ -84,12 +103,12 @@ export function computeAnalytics(input: AnalyticsInput, filters: AnalyticsFilter
     const converted = sList.filter(s => s.payment_status === 'paid').length
     const payers = converted
     const renewed = sList.filter(s => renewedStudentIds.has(s.id)).length
-    const revenueEGP = sList.reduce((sum, s) => sum + (revenueByStudent.get(s.id) ?? 0), 0)
+    const revenue = sList.reduce((sum, s) => sum + (revenueByStudent.get(s.id) ?? 0), 0)
     return {
       id, name, teacherCount, students: total, inactive,
       trials: total, converted, convRate: total ? Math.round((converted / total) * 100) : 0,
       payers, renewed, renewalRate: payers ? Math.round((renewed / payers) * 100) : 0,
-      revenueEGP: Math.round(revenueEGP),
+      revenue: Math.round(revenue),
     }
   }
 
@@ -117,7 +136,7 @@ export function computeAnalytics(input: AnalyticsInput, filters: AnalyticsFilter
   const byCountryMap: Record<string, number> = {}
   for (const p of scopedPayments) {
     const c = studentById.get(p.student_id)?.country || 'Unknown'
-    byCountryMap[c] = (byCountryMap[c] ?? 0) + toEGP(Number(p.amount) || 0, p.currency)
+    byCountryMap[c] = (byCountryMap[c] ?? 0) + toUSD(Number(p.amount) || 0, p.currency, rates)
   }
   const byCountry = Object.entries(byCountryMap).map(([name, v]) => ({ name, value: Math.round(v) }))
     .sort((a, b) => b.value - a.value).slice(0, 12)
@@ -135,7 +154,7 @@ export function computeAnalytics(input: AnalyticsInput, filters: AnalyticsFilter
   for (const p of scopedPayments) {
     const sid = studentById.get(p.student_id)?.added_by_sales_id || 'unassigned'
     salesAgg[sid] ??= { revenue: 0, students: 0, payers: 0, renewed: 0 }
-    salesAgg[sid].revenue += toEGP(Number(p.amount) || 0, p.currency)
+    salesAgg[sid].revenue += toUSD(Number(p.amount) || 0, p.currency, rates)
   }
   const bySales = Object.entries(salesAgg).map(([id, a]) => ({
     name: id === 'unassigned' ? 'Unassigned' : (salesName.get(id) ?? 'Unknown'),

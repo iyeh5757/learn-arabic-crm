@@ -1,7 +1,7 @@
 // app/(dashboard)/admin/supervisor-analysis/page.tsx
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { computeAnalytics } from '@/lib/analytics/supervisor'
+import { computeAnalytics, fetchUsdRates } from '@/lib/analytics/supervisor'
 import Filters from './Filters'
 import MetricsTable from './MetricsTable'
 import Charts from './Charts'
@@ -39,9 +39,10 @@ export default async function SupervisorAnalysisPage({ searchParams }: { searchP
     teacherId: searchParams?.teacher || null,
   }
 
+  const rates = await fetchUsdRates()
   const { supervisorRows, teacherRows: teacherMetrics, byCountry, bySales } = computeAnalytics(
     { supervisors, teachers, students: (students ?? []) as any, payments: (payments ?? []) as any, sales },
-    filters,
+    filters, rates,
   )
 
   return (
@@ -49,7 +50,7 @@ export default async function SupervisorAnalysisPage({ searchParams }: { searchP
       <div>
         <h1 style={{ fontSize: '24px', fontWeight: 800, color: '#111827', margin: 0 }}>📊 Supervisor & Team Analysis</h1>
         <p style={{ fontSize: '13px', color: '#6B7280', margin: '4px 0 0' }}>
-          Conversion, renewal and revenue by supervisor and teacher. Money shown in EGP (approx.).
+          Conversion, renewal and revenue by supervisor and teacher. Money shown in USD (live rates).
         </p>
       </div>
 
@@ -65,7 +66,7 @@ export default async function SupervisorAnalysisPage({ searchParams }: { searchP
 
       <div style={{ fontSize: '11px', color: '#94A3B8' }}>
         Trial conversion = paying students ÷ all students (a trial is "lost" unless that student has paid).
-        Renewal rate = students with a renewal payment ÷ paying students. Month filter scopes by created date. Currency converted to EGP at approximate rates.
+        Renewal rate = students with a renewal payment ÷ paying students. Month filter scopes by created date. Currency converted to USD at live rates.
       </div>
     </div>
   )
