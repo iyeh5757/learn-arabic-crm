@@ -37,12 +37,12 @@ export default function MetricsTable({
                   <>
                     <th style={th}>Trial Conversion</th>
                     <th style={th}>Renewal Rate</th>
-                    <th style={th}>Total Students</th>
+                    <th style={th}>Active Students</th>
                     <th style={th}>Inactive</th>
                   </>
                 ) : (
                   <>
-                    <th style={th}>Students</th>
+                    <th style={th}>Active Students</th>
                     <th style={th}>Revenue (USD)</th>
                   </>
                 )}

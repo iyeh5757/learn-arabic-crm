@@ -59,7 +59,7 @@ export default async function SupervisorOwnAnalysisPage({ searchParams }: { sear
       <MetricsTable title="👩‍🏫 By Teacher" rows={teacherMetrics} level="teacher" variant="performance" />
 
       <div style={{ fontSize: '11px', color: '#94A3B8' }}>
-        Trial conversion = paying students ÷ all students. Renewal rate = students with a renewal payment ÷ paying students. Month filter scopes by created date.
+        Active Students / Inactive = current counts. Trial conversion = students who have paid ÷ all students. Renewal rate = students who paid again after their first plan (2+ payments) ÷ students who have paid. Lifetime figures.
       </div>
     </div>
   )

@@ -85,27 +85,36 @@ export function computeAnalytics(input: AnalyticsInput, filters: AnalyticsFilter
   if (filters.teacherId)    teacherScope = teacherScope.filter(t => t.id === filters.teacherId)
   const scopedTeacherIds = new Set(teacherScope.map(t => t.id))
 
-  // Month-scoped data
-  const students = input.students.filter(s => inMonth(s.created_at, month))
-  const payments = input.payments.filter(p => p.status === 'paid' && inMonth(p.created_at, month))
+  // Performance metrics (conversion, renewal, counts) are lifetime; revenue is
+  // scoped to the selected month.
+  const students = input.students
+  const allPaid   = input.payments.filter(p => p.status === 'paid')
+  const monthPaid = allPaid.filter(p => inMonth(p.created_at, month))
 
-  // Per-student lookups
+  // How many paid payments each student has made (across their lifetime).
+  // 1+ paid = they completed/paid for a plan; 2+ paid = they renewed (paid again
+  // after the first plan).
+  const paidCount = new Map<string, number>()
+  for (const p of allPaid) paidCount.set(p.student_id, (paidCount.get(p.student_id) ?? 0) + 1)
+  const paidStudentIds    = new Set(Array.from(paidCount.entries()).filter(([, c]) => c >= 1).map(([id]) => id))
+  const renewedStudentIds = new Set(Array.from(paidCount.entries()).filter(([, c]) => c >= 2).map(([id]) => id))
+
   const studentById = new Map(students.map(s => [s.id, s]))
-  const renewedStudentIds = new Set(payments.filter(p => p.is_renewal).map(p => p.student_id))
   const revenueByStudent = new Map<string, number>()
-  for (const p of payments) {
+  for (const p of monthPaid) {
     revenueByStudent.set(p.student_id, (revenueByStudent.get(p.student_id) ?? 0) + toUSD(Number(p.amount) || 0, p.currency, rates))
   }
 
   function rowForStudents(id: string, name: string, sList: Student[], teacherCount?: number): MetricRow {
-    const total = sList.length
+    const total = sList.length                                                   // all students (every one did a trial)
+    const active = sList.filter(s => s.student_status === 'active').length
     const inactive = sList.filter(s => s.student_status === 'inactive').length
-    const converted = sList.filter(s => s.payment_status === 'paid').length
+    const converted = sList.filter(s => paidStudentIds.has(s.id)).length         // paid at least once
     const payers = converted
-    const renewed = sList.filter(s => renewedStudentIds.has(s.id)).length
+    const renewed = sList.filter(s => renewedStudentIds.has(s.id)).length        // paid again after first plan
     const revenue = sList.reduce((sum, s) => sum + (revenueByStudent.get(s.id) ?? 0), 0)
     return {
-      id, name, teacherCount, students: total, inactive,
+      id, name, teacherCount, students: active, inactive,
       trials: total, converted, convRate: total ? Math.round((converted / total) * 100) : 0,
       payers, renewed, renewalRate: payers ? Math.round((renewed / payers) * 100) : 0,
       revenue: Math.round(revenue),
@@ -130,7 +139,7 @@ export function computeAnalytics(input: AnalyticsInput, filters: AnalyticsFilter
   // ── Charts (respect the teacher scope) ──────────────────────────────────
   const scopedStudents = students.filter(s => s.assigned_teacher_id && scopedTeacherIds.has(s.assigned_teacher_id))
   const scopedStudentIds = new Set(scopedStudents.map(s => s.id))
-  const scopedPayments = payments.filter(p => scopedStudentIds.has(p.student_id))
+  const scopedPayments = monthPaid.filter(p => scopedStudentIds.has(p.student_id))
 
   // Revenue by country
   const byCountryMap: Record<string, number> = {}

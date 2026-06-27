@@ -65,8 +65,8 @@ export default async function SupervisorAnalysisPage({ searchParams }: { searchP
       <Charts byCountry={byCountry} bySales={bySales} />
 
       <div style={{ fontSize: '11px', color: '#94A3B8' }}>
-        Trial conversion = paying students ÷ all students (a trial is "lost" unless that student has paid).
-        Renewal rate = students with a renewal payment ÷ paying students. Month filter scopes by created date. Currency converted to USD at live rates.
+        Active Students / Inactive = current counts in the team. Trial conversion = students who have paid ÷ all students (a trial is "lost" unless that student paid).
+        Renewal rate = students who paid again after their first plan (2+ payments) ÷ students who have paid. These are lifetime figures; the month filter scopes revenue only. Currency in USD at live rates.
       </div>
     </div>
   )
