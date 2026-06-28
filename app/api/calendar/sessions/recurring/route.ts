@@ -100,18 +100,21 @@ export async function POST(req: Request) {
     } catch (e: any) { console.error('[Recurring] meet space failed:', e?.message) }
   }
 
-  // Create a session (+ calendar event) per occurrence
+  // Create a session (+ calendar event) per occurrence.
+  // Only the FIRST occurrence gets a Google Calendar event (to send the email
+  // invite and anchor the series). Later occurrences share the same Meet link
+  // stored in the CRM — creating one Calendar event per occurrence burns API
+  // quota and floods the student's Google Calendar.
   const summary = `${typeName} — ${student_name ?? 'Student'} with ${teacherName}`
   let created = 0
   for (let i = 0; i < occurrences.length; i++) {
     const occ = occurrences[i]
     let googleEventId: string | null = null
-    if (meetLink && isGoogleConfigured()) {
+    if (i === 0 && meetLink && isGoogleConfigured()) {
       try {
         const ev = await createCalendarEventWithLink(
           { summary, description: notes ?? '', startIso: occ.startIso, endIso: occ.endIso, timezone: TZ, attendees: [student_email, teacherEmail].filter(Boolean) },
-          meetLink,
-          i === 0 ? 'all' : 'none',   // only the first invite emails the student
+          meetLink, 'all',
         )
         googleEventId = ev?.eventId ?? null
       } catch (e: any) { console.error('[Recurring] calendar event failed:', e?.message) }

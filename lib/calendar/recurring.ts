@@ -4,7 +4,7 @@
 // series stop at their until_date.
 
 import { createAdminClient } from '@/lib/supabase/admin'
-import { createCalendarEventWithLink, isGoogleConfigured } from './google'
+import { isGoogleConfigured } from './google'
 
 const TZ = 'Africa/Cairo'
 const HORIZON_WEEKS = 8
@@ -55,13 +55,6 @@ async function topUpOne(supabase: any, rule: any): Promise<number> {
   const days: number[] = rule.days_of_week ?? []
   const timeHHmm = (rule.start_time ?? '00:00').slice(0, 5)
 
-  // Optional teacher email for the invite
-  let teacherEmail = ''
-  if (tmpl.teacher_id) {
-    const { data: t } = await supabase.from('teachers').select('profile:profiles!teachers_user_id_fkey(email)').eq('id', tmpl.teacher_id).maybeSingle()
-    teacherEmail = (t as any)?.profile?.email ?? ''
-  }
-
   let created = 0
   const cursor = new Date(tmpl.start_at); cursor.setHours(0, 0, 0, 0); cursor.setDate(cursor.getDate() + 1)
   for (let guard = 0; cursor <= endCap && guard < 130; guard++, cursor.setDate(cursor.getDate() + 1)) {
@@ -71,17 +64,10 @@ async function topUpOne(supabase: any, rule: any): Promise<number> {
     if (existingTimes.has(start.getTime())) continue
     const end = new Date(start.getTime() + rule.duration_minutes * 60000)
 
-    let googleEventId: string | null = null
-    if (tmpl.google_meet_link && isGoogleConfigured()) {
-      try {
-        const ev = await createCalendarEventWithLink(
-          { summary: tmpl.title || `Arabic session — ${tmpl.student_name ?? ''}`, description: tmpl.notes ?? '', startIso: start.toISOString(), endIso: end.toISOString(), timezone: TZ, attendees: [tmpl.student_email, teacherEmail].filter(Boolean) },
-          tmpl.google_meet_link, 'none',
-        )
-        googleEventId = ev?.eventId ?? null
-      } catch (e: any) { console.error('[Recurring] event create:', e?.message) }
-    }
-
+    // Do NOT create individual Calendar events for extended occurrences.
+    // The student was already invited via the first occurrence and has the Meet
+    // link in the CRM. Creating one event per top-up occurrence burns Calendar
+    // API quota (quota is shared; exhausting it blocks all bookings).
     await supabase.from('calendar_sessions').insert({
       session_type_id: tmpl.session_type_id, teacher_id: tmpl.teacher_id, student_id: tmpl.student_id,
       student_name: tmpl.student_name, student_email: tmpl.student_email, student_phone: tmpl.student_phone,
