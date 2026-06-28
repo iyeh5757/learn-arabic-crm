@@ -26,16 +26,26 @@ export async function GET() {
   }
 
   try {
+    // Evolution API v2 uses POST for fetchAllGroups
     const res = await fetch(
-      `${API_URL}/group/fetchAllGroups/${INSTANCE}?getParticipants=false`,
-      { headers: { apikey: API_KEY } }
+      `${API_URL}/group/fetchAllGroups/${INSTANCE}`,
+      {
+        method: 'POST',
+        headers: { apikey: API_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ getParticipants: false }),
+      }
     )
-    const json = await res.json()
-    if (!res.ok) return NextResponse.json({ error: json?.message ?? `HTTP ${res.status}` }, { status: 400 })
+    let json: any = null
+    try { json = await res.json() } catch { /* non-JSON body */ }
+    if (!res.ok) {
+      const msg = json?.message ?? json?.error ?? (typeof json === 'string' ? json : null) ?? `HTTP ${res.status}`
+      return NextResponse.json({ error: msg }, { status: 400 })
+    }
 
-    const groups = (Array.isArray(json) ? json : [])
-      .map((g: any) => ({ id: g.id ?? '', name: g.subject ?? g.name ?? g.id ?? '' }))
-      .filter((g: any) => g.id.endsWith('@g.us'))   // groups only
+    const list = Array.isArray(json) ? json : (json?.groups ?? json?.data ?? [])
+    const groups = list
+      .map((g: any) => ({ id: g.id ?? g.jid ?? '', name: g.subject ?? g.name ?? '' }))
+      .filter((g: any) => g.id.endsWith('@g.us'))
       .sort((a: any, b: any) => a.name.localeCompare(b.name))
 
     return NextResponse.json(groups)
