@@ -8,7 +8,9 @@ export default function SessionsPage() {
   const supabase = createClient()
   const [sessions, setSessions] = useState<any[]>([])
   const [teachers, setTeachers] = useState<any[]>([])
+  const [students, setStudents] = useState<any[]>([])
   const [selectedTeacher, setSelectedTeacher] = useState('')
+  const [selectedStudent, setSelectedStudent] = useState('')
   const [selectedMonth, setSelectedMonth] = useState(() => {
     const now = new Date()
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
@@ -17,6 +19,7 @@ export default function SessionsPage() {
 
   useEffect(() => {
     supabase.from('teachers').select('id, profile:profiles!teachers_user_id_fkey(name)').eq('is_active', true).then(({ data }) => setTeachers(data ?? []))
+    supabase.from('students').select('id, name').order('name').then(({ data }) => setStudents(data ?? []))
   }, [])
 
   useEffect(() => {
@@ -32,8 +35,9 @@ export default function SessionsPage() {
       .lte('session_date', monthEnd)
       .order('session_date', { ascending: false })
     if (selectedTeacher) query = query.eq('teacher_id', selectedTeacher)
+    if (selectedStudent) query = query.eq('student_id', selectedStudent)
     query.then(({ data }) => { setSessions(data ?? []); setLoading(false) })
-  }, [selectedTeacher, selectedMonth])
+  }, [selectedTeacher, selectedStudent, selectedMonth])
 
   const attColor: Record<string, { bg: string; text: string }> = {
     attended:  { bg: '#ECFDF5', text: '#059669' },
@@ -62,8 +66,13 @@ export default function SessionsPage() {
             <option value="">All Teachers</option>
             {teachers.map((t: any) => <option key={t.id} value={t.id}>{t.profile?.name}</option>)}
           </select>
-          {selectedTeacher && (
-            <button onClick={() => setSelectedTeacher('')} style={{ background: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA', padding: '8px 14px', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', fontWeight: '500' }}>
+          {/* Student filter */}
+          <select style={{ ...inp, minWidth: '180px' }} value={selectedStudent} onChange={e => setSelectedStudent(e.target.value)}>
+            <option value="">All Students</option>
+            {students.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          {(selectedTeacher || selectedStudent) && (
+            <button onClick={() => { setSelectedTeacher(''); setSelectedStudent('') }} style={{ background: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA', padding: '8px 14px', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', fontWeight: '500' }}>
               Clear ✕
             </button>
           )}
