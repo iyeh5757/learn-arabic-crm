@@ -26,13 +26,14 @@ const inp: React.CSSProperties = { padding: '9px 11px', border: '1px solid #E2E8
 const lbl: React.CSSProperties = { fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: '5px', display: 'block' }
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
-const EMPTY_BLOCK = { date: '', start_time: '', end_time: '', reason: '', recurring: false, days: [] as number[], weeks: 8 }
+const EMPTY_BLOCK = { date: '', start_time: '', end_time: '', reason: '', recurring: false, days: [] as number[], weeks: 8, never_end: false }
 
 export default function TeacherCalendar() {
   const calRef = useRef<any>(null)
   const [selected, setSelected] = useState<any>(null)
   const [busy, setBusy] = useState(false)
   const [blockForm, setBlockForm] = useState<typeof EMPTY_BLOCK | null>(null)
+  const [retime, setRetime] = useState<null | { group: string; start_time: string; end_time: string }>(null)
 
   const loadEvents = useCallback(async (info: any, success: any, failure: any) => {
     try {
@@ -91,7 +92,7 @@ export default function TeacherCalendar() {
 
   async function saveBlock() {
     if (!blockForm) return
-    const { date, start_time, end_time, recurring, days, weeks, reason } = blockForm
+    const { date, start_time, end_time, recurring, days, weeks, never_end, reason } = blockForm
     if (!date || !start_time || !end_time) { alert('Pick a date, start time and end time.'); return }
     if (cairoToUtc(date, end_time) <= cairoToUtc(date, start_time)) { alert('End time must be after start time.'); return }
 
@@ -100,8 +101,10 @@ export default function TeacherCalendar() {
       blocks.push({ start_at: cairoToUtc(date, start_time).toISOString(), end_at: cairoToUtc(date, end_time).toISOString() })
     } else {
       if (days.length === 0) { alert('Pick at least one weekday to repeat on.'); return }
+      const horizonWeeks = never_end ? 104 : weeks   // "never" = 2 years of blocks (cheap CRM rows)
+      const MAX = 500
       const [by, bm, bd] = date.split('-').map(Number)
-      for (let n = 0; n < weeks * 7; n++) {
+      for (let n = 0; n < horizonWeeks * 7 && blocks.length < MAX; n++) {
         const day = new Date(by, bm - 1, bd + n)
         if (!days.includes(day.getDay())) continue
         const ds = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, '0')}-${String(day.getDate()).padStart(2, '0')}`
@@ -128,6 +131,27 @@ export default function TeacherCalendar() {
     setBusy(false)
     if (res.ok) { setSelected(null); refresh() }
     else alert('Failed to remove block')
+  }
+
+  function startRetime() {
+    if (!selected) return
+    setRetime({
+      group: selected.data.recurrence_group_id,
+      start_time: cairoParts(new Date(selected.data.start_at)).time,
+      end_time: cairoParts(new Date(selected.data.end_at)).time,
+    })
+  }
+  async function saveRetime() {
+    if (!retime) return
+    if (cairoToUtc('2000-01-01', retime.end_time) <= cairoToUtc('2000-01-01', retime.start_time)) { alert('End time must be after start time.'); return }
+    setBusy(true)
+    const res = await fetch('/api/calendar/blocks/series', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ group: retime.group, start_time: retime.start_time, end_time: retime.end_time }),
+    })
+    setBusy(false)
+    if (res.ok) { setRetime(null); setSelected(null); refresh() }
+    else { const d = await res.json(); alert(`Couldn't update series: ${d?.error ?? 'error'}`) }
   }
 
   return (
@@ -235,12 +259,21 @@ export default function TeacherCalendar() {
                         </button>
                       ))}
                     </div>
-                    <label style={{ fontSize:'12px', color:'#475569', display:'flex', alignItems:'center', gap:'8px' }}>
-                      Repeat for
-                      <input type="number" min={1} max={52} value={blockForm.weeks} onChange={e => setBlockForm(f => f && ({ ...f, weeks: Math.max(1, Math.min(52, Number(e.target.value) || 1)) }))}
-                        style={{ width:'64px', padding:'6px 8px', border:'1px solid #E2E8F0', borderRadius:'8px', fontSize:'13px' }} />
-                      weeks
-                    </label>
+                    <div style={{ display:'flex', alignItems:'center', gap:'10px', marginBottom:'8px' }}>
+                      <button type="button" onClick={() => setBlockForm(f => f && ({ ...f, never_end: !f.never_end }))}
+                        style={{ width:'42px', height:'24px', borderRadius:'12px', background: blockForm.never_end ? '#0D1B2A' : '#CBD5E1', border:'none', cursor:'pointer', position:'relative', flexShrink:0, transition:'background 0.2s' }}>
+                        <span style={{ position:'absolute', width:'18px', height:'18px', borderRadius:'50%', background:'#fff', top:'3px', left: blockForm.never_end ? '21px' : '3px', transition:'left 0.2s' }} />
+                      </button>
+                      <span style={{ fontSize:'13px', fontWeight:'600', color:'#334155' }}>♾️ Never ends</span>
+                    </div>
+                    {!blockForm.never_end && (
+                      <label style={{ fontSize:'12px', color:'#475569', display:'flex', alignItems:'center', gap:'8px' }}>
+                        Repeat for
+                        <input type="number" min={1} max={52} value={blockForm.weeks} onChange={e => setBlockForm(f => f && ({ ...f, weeks: Math.max(1, Math.min(52, Number(e.target.value) || 1)) }))}
+                          style={{ width:'64px', padding:'6px 8px', border:'1px solid #E2E8F0', borderRadius:'8px', fontSize:'13px' }} />
+                        weeks
+                      </label>
+                    )}
                   </div>
                 )}
               </div>
@@ -259,7 +292,7 @@ export default function TeacherCalendar() {
       {/* Detail popup */}
       {selected && (
         <div style={{ position:'fixed', inset:0, background:'rgba(15,23,42,0.4)', zIndex:50, display:'flex', alignItems:'center', justifyContent:'center', padding:'16px' }}
-          onClick={() => setSelected(null)}>
+          onClick={() => { setSelected(null); setRetime(null) }}>
           <div style={{ background:'#fff', borderRadius:'16px', width:'100%', maxWidth:'340px', padding:'20px', boxShadow:'0 12px 40px rgba(15,23,42,0.2)' }}
             onClick={e => e.stopPropagation()}>
             {selected.kind === 'block' ? (
@@ -270,7 +303,27 @@ export default function TeacherCalendar() {
                   {selected.data.recurrence_group_id && <span style={{ display:'block', fontSize:'12px', color:'#8B5CF6', fontWeight:'700', marginTop:'4px' }}>🔁 Part of a repeating block</span>}
                 </div>
                 {selected.data.recurrence_group_id ? (
+                  retime ? (
+                    <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
+                      <div style={{ fontSize:'11px', fontWeight:'700', color:'#64748B', textTransform:'uppercase' }}>New time for the whole series</div>
+                      <div style={{ display:'flex', gap:'8px' }}>
+                        <input type="time" value={retime.start_time} onChange={e => setRetime(r => r && ({ ...r, start_time: e.target.value }))}
+                          style={{ flex:1, padding:'9px 10px', border:'1px solid #E2E8F0', borderRadius:'10px', fontSize:'13px' }} />
+                        <input type="time" value={retime.end_time} onChange={e => setRetime(r => r && ({ ...r, end_time: e.target.value }))}
+                          style={{ flex:1, padding:'9px 10px', border:'1px solid #E2E8F0', borderRadius:'10px', fontSize:'13px' }} />
+                      </div>
+                      <div style={{ fontSize:'11px', color:'#94A3B8' }}>Applies to all upcoming blocks in this series.</div>
+                      <div style={{ display:'flex', gap:'8px' }}>
+                        <button onClick={() => setRetime(null)} disabled={busy} style={{ flex:1, padding:'9px', background:'#fff', color:'#475569', border:'1px solid #E2E8F0', borderRadius:'10px', fontSize:'12px', fontWeight:'700', cursor:'pointer' }}>Back</button>
+                        <button onClick={saveRetime} disabled={busy} style={{ flex:1, padding:'9px', background:'#0D1B2A', color:'#E8C97A', border:'none', borderRadius:'10px', fontSize:'12px', fontWeight:'700', cursor:'pointer' }}>{busy ? 'Saving…' : 'Save new time'}</button>
+                      </div>
+                    </div>
+                  ) : (
                   <div style={{ display:'flex', flexDirection:'column', gap:'8px' }}>
+                    <button onClick={startRetime} disabled={busy}
+                      style={{ width:'100%', padding:'9px', background:'#E0E7FF', color:'#3730A3', border:'none', borderRadius:'10px', fontSize:'12px', fontWeight:'700', cursor:'pointer' }}>
+                      🕑 Edit series time
+                    </button>
                     <div style={{ fontSize:'11px', fontWeight:'700', color:'#64748B', textTransform:'uppercase' }}>Remove…</div>
                     <button onClick={() => removeBlock(selected.data.id, 'one')} disabled={busy}
                       style={{ width:'100%', padding:'9px', background:'#F1F5F9', color:'#334155', border:'none', borderRadius:'10px', fontSize:'12px', fontWeight:'700', cursor:'pointer' }}>
@@ -285,6 +338,7 @@ export default function TeacherCalendar() {
                       All in the series
                     </button>
                   </div>
+                  )
                 ) : (
                   <button onClick={() => { if (confirm('Remove this blocked time?')) removeBlock(selected.data.id, 'one') }} disabled={busy}
                     style={{ width:'100%', padding:'9px', background:'#FEE2E2', color:'#B91C1C', border:'none', borderRadius:'10px', fontSize:'12px', fontWeight:'700', cursor:'pointer' }}>
