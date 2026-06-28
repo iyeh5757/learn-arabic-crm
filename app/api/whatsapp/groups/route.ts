@@ -25,24 +25,37 @@ export async function GET() {
     return NextResponse.json({ error: 'WhatsApp credentials not configured' }, { status: 400 })
   }
 
-  try {
-    // getParticipants is a required query param on Evolution v2
+  // We only need group names + IDs, never the member lists. Fetching
+  // participants makes WhatsApp throttle ("rate-overlimit"), so request
+  // getParticipants=false. Some Evolution builds 500 on false, so fall back
+  // to true once if needed.
+  async function fetchGroups(getParticipants: boolean) {
     const res = await fetch(
-      `${API_URL}/group/fetchAllGroups/${INSTANCE}?getParticipants=true`,
+      `${API_URL}/group/fetchAllGroups/${INSTANCE}?getParticipants=${getParticipants}`,
       { headers: { apikey: API_KEY } }
     )
     const raw = await res.text()
     let json: any = null
     try { json = JSON.parse(raw) } catch { /* non-JSON body */ }
-    if (!res.ok) {
-      // Evolution nests the real reason in response.message (often an array)
-      const detail = json?.response?.message ?? json?.message ?? json?.error
-      const msg = (Array.isArray(detail) ? detail.join('; ') : detail)
-        ?? (raw ? raw.slice(0, 300) : `HTTP ${res.status}`)
-      return NextResponse.json({ error: msg, status: res.status }, { status: 400 })
-    }
+    return { ok: res.ok, status: res.status, raw, json }
+  }
 
-    const list = Array.isArray(json) ? json : (json?.groups ?? json?.data ?? [])
+  function extractError(r: { status: number; raw: string; json: any }): string {
+    const detail = r.json?.response?.message ?? r.json?.message ?? r.json?.error
+    const msg = (Array.isArray(detail) ? detail.join('; ') : detail)
+      ?? (r.raw ? r.raw.slice(0, 300) : `HTTP ${r.status}`)
+    if (typeof msg === 'string' && /rate.?overlimit|rate.?limit|429/i.test(msg)) {
+      return 'WhatsApp is rate-limiting group lookups right now. Please wait ~1 minute and try again.'
+    }
+    return typeof msg === 'string' ? msg : JSON.stringify(msg)
+  }
+
+  try {
+    let r = await fetchGroups(false)
+    if (!r.ok && r.status >= 500) r = await fetchGroups(true)   // fallback for builds that 500 on false
+    if (!r.ok) return NextResponse.json({ error: extractError(r), status: r.status }, { status: 400 })
+
+    const list = Array.isArray(r.json) ? r.json : (r.json?.groups ?? r.json?.data ?? [])
     const groups = list
       .map((g: any) => ({ id: g.id ?? g.jid ?? '', name: g.subject ?? g.name ?? '' }))
       .filter((g: any) => g.id.endsWith('@g.us'))
