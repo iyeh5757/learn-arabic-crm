@@ -85,11 +85,15 @@ export function computeAnalytics(input: AnalyticsInput, filters: AnalyticsFilter
   if (filters.teacherId)    teacherScope = teacherScope.filter(t => t.id === filters.teacherId)
   const scopedTeacherIds = new Set(teacherScope.map(t => t.id))
 
-  // Performance metrics (conversion, renewal, counts) are lifetime; revenue is
-  // scoped to the selected month.
-  const students = input.students
+  // When a month is selected: students are scoped to the cohort acquired in that
+  // month (created_at in that month), and revenue is scoped to payments in that
+  // month. Conversion / renewal are lifetime figures for that cohort.
+  // When no month is selected: all students + all payments (lifetime view).
   const allPaid   = input.payments.filter(p => p.status === 'paid')
   const monthPaid = allPaid.filter(p => inMonth(p.created_at, month))
+  const students  = month
+    ? input.students.filter(s => inMonth(s.created_at, month))
+    : input.students
 
   // How many paid payments each student has made (across their lifetime).
   // 1+ paid = they completed/paid for a plan; 2+ paid = they renewed (paid again
