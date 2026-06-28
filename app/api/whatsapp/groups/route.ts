@@ -26,14 +26,9 @@ export async function GET() {
   }
 
   try {
-    // Evolution API v2 uses POST for fetchAllGroups
     const res = await fetch(
       `${API_URL}/group/fetchAllGroups/${INSTANCE}`,
-      {
-        method: 'POST',
-        headers: { apikey: API_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ getParticipants: false }),
-      }
+      { headers: { apikey: API_KEY } }
     )
     let json: any = null
     try { json = await res.json() } catch { /* non-JSON body */ }
