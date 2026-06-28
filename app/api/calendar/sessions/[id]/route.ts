@@ -23,9 +23,10 @@ async function targetSessions(supabase: any, base: any, scope: string) {
 // Sync a cancel/delete to Google. Recurring rows all share one master event ID,
 // so we act on the master (delete whole series), the series tail (truncate), or a
 // single instance — depending on scope — instead of deleting the master N times.
-async function googleSyncRemoval(base: any, scope: string) {
+// Returns whether the Google side is in sync, with a warning message if not.
+async function googleSyncRemoval(base: any, scope: string): Promise<{ synced: boolean; warning?: string }> {
   const eid = base.google_event_id
-  if (!eid) return
+  if (!eid) return { synced: true }   // nothing linked in Google — nothing to remove
   try {
     if (!base.recurring_rule_id || scope === 'all') {
       await deleteCalendarEvent(eid)                          // single event, or whole series
@@ -34,7 +35,11 @@ async function googleSyncRemoval(base: any, scope: string) {
     } else {
       await cancelRecurringInstance(eid, base.start_at)       // just this occurrence
     }
-  } catch (e: any) { console.error('[Calendar] removal sync:', e?.message) }
+    return { synced: true }
+  } catch (e: any) {
+    console.error('[Calendar] removal sync:', e?.message)
+    return { synced: false, warning: `Removed in the CRM, but Google Calendar could not be updated: ${e?.message ?? 'unknown error'}. Please remove it manually in Google.` }
+  }
 }
 
 // PATCH — cancel / reschedule (single, or scoped across a recurring series)
@@ -78,7 +83,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   // Cancel (optionally scoped across the recurring series)
   if (status === 'cancelled') {
     const rows = await targetSessions(supabase, existing, scope)
-    await googleSyncRemoval(existing, scope)
+    const sync = await googleSyncRemoval(existing, scope)
     const ids = rows.map((r: any) => r.id)
     await supabase.from('calendar_sessions').update({ status: 'cancelled', updated_by: user.id, updated_at: new Date().toISOString() }).in('id', ids)
     // Stop a recurring series from generating more when cancelling future/all
@@ -86,7 +91,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
       await supabase.from('recurring_rules').update({ is_active: false }).eq('id', existing.recurring_rule_id)
     }
     await supabase.from('calendar_audit_log').insert({ event_id: params.id, action: 'cancelled', performed_by: user.id, old_data: existing, source: 'crm' })
-    return NextResponse.json({ ok: true, affected: ids.length })
+    return NextResponse.json({ ok: true, affected: ids.length, googleSynced: sync.synced, warning: sync.warning })
   }
 
   // Plain field update (notes / status other than cancel)
@@ -110,7 +115,7 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
   if (!existing) return NextResponse.json({ error: 'Session not found' }, { status: 404 })
 
   const rows = await targetSessions(supabase, existing, scope)
-  await googleSyncRemoval(existing, scope)
+  const sync = await googleSyncRemoval(existing, scope)
   const ids = rows.map((r: any) => r.id)
   const { error } = await supabase.from('calendar_sessions').delete().in('id', ids)
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
@@ -121,5 +126,5 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
   }
 
   await supabase.from('calendar_audit_log').insert({ event_id: params.id, action: 'deleted', performed_by: user.id, old_data: existing, source: 'crm' })
-  return NextResponse.json({ ok: true, affected: ids.length })
+  return NextResponse.json({ ok: true, affected: ids.length, googleSynced: sync.synced, warning: sync.warning })
 }

@@ -337,13 +337,14 @@ export async function getCalendarEvent(eventId: string): Promise<FetchedEvent | 
 }
 
 // Moves a Google Calendar event to a new time and notifies attendees.
+// Throws on real failures so the caller can surface them.
 export async function updateCalendarEventTime(
   eventId: string, startIso: string, endIso: string, timezone: string
 ): Promise<void> {
   if (!isGoogleConfigured() || !eventId) return
   const token = await getAccessToken()
-  await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CALENDAR_ID)}/events/${eventId}?sendUpdates=all`,
+  const res = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CALENDAR_ID)}/events/${encodeURIComponent(eventId)}?sendUpdates=all`,
     {
       method: 'PATCH',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -353,6 +354,10 @@ export async function updateCalendarEventTime(
       }),
     }
   )
+  if (!res.ok && res.status !== 404 && res.status !== 410) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body?.error?.message ?? `Google reschedule failed (HTTP ${res.status})`)
+  }
 }
 
 // Applies Meet settings (open access, auto-record) to an existing Meet link.
@@ -409,11 +414,17 @@ export async function configureMeetSpace(
 }
 
 // Cancels/deletes a Google Calendar event and notifies attendees.
-export async function deleteCalendarEvent(eventId: string): Promise<void> {
-  if (!isGoogleConfigured() || !eventId) return
+// Returns whether the event is gone (a 404/410 means it was already deleted,
+// which we treat as success). Throws on real failures so callers can surface them.
+export async function deleteCalendarEvent(eventId: string): Promise<{ ok: boolean; alreadyGone?: boolean }> {
+  if (!isGoogleConfigured() || !eventId) return { ok: false }
   const token = await getAccessToken()
-  await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CALENDAR_ID)}/events/${eventId}?sendUpdates=all`,
+  const res = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CALENDAR_ID)}/events/${encodeURIComponent(eventId)}?sendUpdates=all`,
     { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } }
   )
+  if (res.ok) return { ok: true }
+  if (res.status === 404 || res.status === 410) return { ok: true, alreadyGone: true }  // already deleted in Google
+  const body = await res.json().catch(() => ({}))
+  throw new Error(body?.error?.message ?? `Google delete failed (HTTP ${res.status})`)
 }

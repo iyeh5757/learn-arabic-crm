@@ -311,9 +311,12 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status: 'cancelled', scope }),
     })
+    const data = await res.json().catch(() => ({}))
     setBusy(false)
-    if (res.ok) { setSelected(null); refresh() }
-    else alert('Failed to cancel session')
+    if (res.ok) {
+      setSelected(null); refresh()
+      if (data?.warning) alert(`⚠️ ${data.warning}`)
+    } else alert(`Failed to cancel session: ${data?.error ?? 'unknown error'}`)
   }
 
   async function deleteSession(scope: 'one' | 'future' | 'all' = 'one') {
@@ -321,9 +324,12 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
     if (scope === 'one' && !confirm('Permanently delete this session? This cannot be undone.')) return
     setBusy(true)
     const res = await fetch(`/api/calendar/sessions/${selected.id}?scope=${scope}`, { method: 'DELETE' })
+    const data = await res.json().catch(() => ({}))
     setBusy(false)
-    if (res.ok) { setSelected(null); refresh() }
-    else alert('Failed to delete session')
+    if (res.ok) {
+      setSelected(null); refresh()
+      if (data?.warning) alert(`⚠️ ${data.warning}`)
+    } else alert(`Failed to delete session: ${data?.error ?? 'unknown error'}`)
   }
 
   function copyMeet() {
