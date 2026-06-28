@@ -54,6 +54,7 @@ export default function SupervisorEditStudentPage() {
       payment_status: form.payment_status,
       reminder_date: form.reminder_date || null,
       notes: form.notes || null,
+      whatsapp_group_id: form.whatsapp_group_id || null,
     }).eq('id', id)
     if (err) { setError(err.message); setSaving(false); return }
     router.push('/supervisor/reminders')
@@ -228,6 +229,31 @@ export default function SupervisorEditStudentPage() {
           <div style={{ padding: '20px 22px' }}>
             <label style={lbl}>Notes</label>
             <textarea style={{ ...inp, minHeight: '80px', resize: 'vertical' }} value={form.notes ?? ''} onChange={e => setForm((f: any) => ({...f, notes: e.target.value}))} />
+          </div>
+        </div>
+
+        <div style={{ ...card, border: '1px solid #D1FAE5' }}>
+          <div style={{ ...cardH, background: '#F0FDF4', color: '#065F46' }}>💬 WhatsApp Group Reminders</div>
+          <div style={{ padding: '20px 22px' }}>
+            <p style={{ fontSize: '13px', color: '#6B7280', margin: '0 0 14px 0' }}>
+              When set, session reminders go to this group instead of the student's private number. Get the group ID from the admin.
+            </p>
+            <label style={lbl}>WhatsApp Group ID</label>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <input style={{ ...inp, fontFamily: 'monospace', fontSize: '13px' }}
+                placeholder="e.g. 120363XXXXXXXXXX@g.us"
+                value={form.whatsapp_group_id ?? ''}
+                onChange={e => setForm((f: any) => ({ ...f, whatsapp_group_id: e.target.value }))} />
+              {form.whatsapp_group_id && (
+                <button type="button" onClick={() => setForm((f: any) => ({ ...f, whatsapp_group_id: '' }))}
+                  style={{ whiteSpace: 'nowrap', background: '#FEF2F2', color: '#DC2626', padding: '9px 14px', borderRadius: '8px', border: '1px solid #FECACA', fontSize: '13px', cursor: 'pointer' }}>
+                  Clear
+                </button>
+              )}
+            </div>
+            {form.whatsapp_group_id && (
+              <p style={{ fontSize: '12px', color: '#059669', margin: '8px 0 0', fontWeight: 600 }}>✅ Reminders will go to this group</p>
+            )}
           </div>
         </div>
 

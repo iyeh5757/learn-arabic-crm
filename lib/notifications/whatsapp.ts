@@ -34,6 +34,7 @@ export interface SessionReminderData {
   meetLink?:    string
   hoursBeforeLabel: '24 hours' | '12 hours' | '1 hour'
   studentCountry?: string   // used to show the student's local time too
+  whatsappGroupId?: string  // when set, reminder goes to the group instead of private
 }
 
 function formatTime(date: Date, timeZone: string): string {
@@ -77,7 +78,10 @@ function buildReminderText(data: SessionReminderData): string {
   // Reschedule / cancel notice only on the earlier reminders (not the 1-hour one)
   if (data.hoursBeforeLabel === '24 hours' || data.hoursBeforeLabel === '12 hours') {
     if (isTrial) {
-      lines.push(``, `📌 Need to reschedule or cancel? Please message us here in our chat and we'll be happy to help.`)
+      lines.push(``, `📌 Need to reschedule or cancel? Please message us here in the chat and we'll be happy to help.`)
+    } else if (data.whatsappGroupId) {
+      // Already in the group — tell them to reply here
+      lines.push(``, `📌 Need to reschedule? Reply in this group and your supervisor will help. Reschedule requests must be made *at least 12 hours in advance* — otherwise the class will be counted.`)
     } else {
       lines.push(``, `📌 Need to reschedule? Please reach out to your supervisor in your group so they can help. Reschedule requests must be made *at least 12 hours in advance* — otherwise the class will be counted.`)
     }
@@ -124,7 +128,10 @@ export async function sendWhatsAppReminder(
     return { success: false, error: 'Evolution API credentials not configured' }
   }
 
-  const number = normalisePhone(phone)
+  // Use group JID when available, otherwise fall back to private chat.
+  // Group JIDs already contain @g.us and need no normalisation.
+  const number = data.whatsappGroupId ? data.whatsappGroupId : normalisePhone(phone)
+  if (!number) return { success: false, error: 'No phone or group ID available' }
 
   // Evolution API v2 sendText endpoint
   const body = {

@@ -6,6 +6,54 @@ import { useRouter, useParams } from 'next/navigation'
 
 import { COUNTRIES, COUNTRY_CURRENCY } from '@/lib/countries'
 
+function BrowseGroupsModal({ onSelect, onClose }: { onSelect: (id: string) => void; onClose: () => void }) {
+  const [groups, setGroups] = useState<{ id: string; name: string }[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [search, setSearch] = useState('')
+
+  useEffect(() => {
+    fetch('/api/whatsapp/groups')
+      .then(r => r.json())
+      .then(d => { if (d.error) setError(d.error); else setGroups(d); setLoading(false) })
+      .catch(e => { setError(e.message); setLoading(false) })
+  }, [])
+
+  const filtered = groups.filter(g => g.name.toLowerCase().includes(search.toLowerCase()))
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ background: '#fff', borderRadius: '16px', width: '480px', maxHeight: '80vh', display: 'flex', flexDirection: 'column', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
+        <div style={{ padding: '18px 22px', borderBottom: '1px solid #F3F4F6', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ fontWeight: 700, fontSize: '16px' }}>📱 Browse WhatsApp Groups</div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#6B7280' }}>✕</button>
+        </div>
+        <div style={{ padding: '14px 22px', borderBottom: '1px solid #F3F4F6' }}>
+          <input placeholder="Search groups…" value={search} onChange={e => setSearch(e.target.value)}
+            style={{ width: '100%', padding: '8px 12px', border: '1.5px solid #E5E7EB', borderRadius: '8px', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
+        </div>
+        <div style={{ overflowY: 'auto', flex: 1 }}>
+          {loading && <div style={{ padding: '32px', textAlign: 'center', color: '#6B7280' }}>Loading groups…</div>}
+          {error && <div style={{ padding: '24px', color: '#DC2626', fontSize: '14px' }}>Error: {error}</div>}
+          {!loading && !error && filtered.length === 0 && <div style={{ padding: '32px', textAlign: 'center', color: '#9CA3AF' }}>No groups found</div>}
+          {filtered.map(g => (
+            <div key={g.id} onClick={() => { onSelect(g.id); onClose() }}
+              style={{ padding: '12px 22px', cursor: 'pointer', borderBottom: '1px solid #F9FAFB', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#F0FDF4')}
+              onMouseLeave={e => (e.currentTarget.style.background = '')}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: '14px', color: '#111827' }}>{g.name}</div>
+                <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '2px', fontFamily: 'monospace' }}>{g.id}</div>
+              </div>
+              <span style={{ background: '#ECFDF5', color: '#059669', fontSize: '11px', fontWeight: 700, padding: '3px 10px', borderRadius: '20px' }}>Select</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function EditStudentPage() {
   const router = useRouter()
   const params = useParams()
@@ -17,6 +65,7 @@ export default function EditStudentPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [form, setForm] = useState<any>(null)
+  const [showGroups, setShowGroups] = useState(false)
 
   useEffect(() => {
     setLoading(true)
@@ -53,6 +102,7 @@ export default function EditStudentPage() {
       payment_status: form.payment_status,
       reminder_date: form.reminder_date || null,
       notes: form.notes || null,
+      whatsapp_group_id: form.whatsapp_group_id || null,
     }).eq('id', id)
     if (err) { setError(err.message); setSaving(false); return }
     router.push('/admin/students')
@@ -236,6 +286,38 @@ export default function EditStudentPage() {
           </div>
         </div>
 
+        <div style={{ ...card, border: '1px solid #D1FAE5' }}>
+          <div style={{ ...cardH, background: '#F0FDF4', color: '#065F46' }}>💬 WhatsApp Group Reminders</div>
+          <div style={{ padding: '20px 22px' }}>
+            <p style={{ fontSize: '13px', color: '#6B7280', margin: '0 0 14px 0' }}>
+              When a group ID is set, session reminders will be sent to the student's WhatsApp group instead of their private number.
+              Leave blank to keep sending to the student's phone number.
+            </p>
+            <label style={lbl}>WhatsApp Group ID</label>
+            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <input style={{ ...inp, fontFamily: 'monospace', fontSize: '13px' }}
+                placeholder="e.g. 120363XXXXXXXXXX@g.us"
+                value={form.whatsapp_group_id ?? ''}
+                onChange={e => setForm((f: any) => ({ ...f, whatsapp_group_id: e.target.value }))} />
+              <button type="button" onClick={() => setShowGroups(true)}
+                style={{ whiteSpace: 'nowrap', background: '#065F46', color: '#fff', padding: '9px 16px', borderRadius: '8px', border: 'none', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+                Browse Groups
+              </button>
+              {form.whatsapp_group_id && (
+                <button type="button" onClick={() => setForm((f: any) => ({ ...f, whatsapp_group_id: '' }))}
+                  style={{ whiteSpace: 'nowrap', background: '#FEF2F2', color: '#DC2626', padding: '9px 14px', borderRadius: '8px', border: '1px solid #FECACA', fontSize: '13px', cursor: 'pointer' }}>
+                  Clear
+                </button>
+              )}
+            </div>
+            {form.whatsapp_group_id && (
+              <p style={{ fontSize: '12px', color: '#059669', margin: '8px 0 0', fontWeight: 600 }}>
+                ✅ Reminders will go to this group
+              </p>
+            )}
+          </div>
+        </div>
+
         {error && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626', padding: '12px 16px', borderRadius: '8px', fontSize: '14px', marginBottom: '16px' }}>{error}</div>}
 
         <div style={{ display: 'flex', gap: '12px' }}>
@@ -247,6 +329,13 @@ export default function EditStudentPage() {
           </button>
         </div>
       </form>
+
+      {showGroups && (
+        <BrowseGroupsModal
+          onSelect={id => setForm((f: any) => ({ ...f, whatsapp_group_id: id }))}
+          onClose={() => setShowGroups(false)}
+        />
+      )}
     </div>
   )
 }

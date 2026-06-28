@@ -19,7 +19,7 @@ type SessionRow = {
   reminder_1h_sent: boolean
   session_type?: { name?: string } | null
   teacher?: { profile?: { name?: string } } | null
-  student?: { country?: string } | null
+  student?: { country?: string; whatsapp_group_id?: string | null } | null
 }
 
 const SELECT = `
@@ -27,7 +27,7 @@ const SELECT = `
   reminder_24h_sent, reminder_12h_sent, reminder_1h_sent,
   session_type:session_type_config(name),
   teacher:teachers(profile:profiles!teachers_user_id_fkey(name)),
-  student:students(country)
+  student:students(country, whatsapp_group_id)
 `
 
 // Decide which reminder (if any) is due for a session right now.
@@ -59,17 +59,19 @@ export async function sendDueReminderForSession(
 ): Promise<'sent' | 'failed' | 'skipped' | 'none'> {
   const due = pickReminder(s, now)
   if (!due) return 'none'
-  if (!s.student_phone) return 'skipped'   // no phone — leave flags so it can fire if a phone is added
+  // Need either a phone number or a group JID to send to
+  if (!s.student_phone && !s.student?.whatsapp_group_id) return 'skipped'
 
-  const wa = await sendWhatsAppReminder(s.student_phone, {
-    studentName:  s.student_name ?? 'Student',
-    teacherName:  s.teacher?.profile?.name ?? 'your teacher',
-    sessionType:  s.session_type?.name ?? 'Arabic',
-    startAt:      new Date(s.start_at),
-    durationMins: s.duration_minutes,
-    meetLink:     s.google_meet_link ?? undefined,
+  const wa = await sendWhatsAppReminder(s.student_phone ?? '', {
+    studentName:     s.student_name ?? 'Student',
+    teacherName:     s.teacher?.profile?.name ?? 'your teacher',
+    sessionType:     s.session_type?.name ?? 'Arabic',
+    startAt:         new Date(s.start_at),
+    durationMins:    s.duration_minutes,
+    meetLink:        s.google_meet_link ?? undefined,
     hoursBeforeLabel: due.label,
-    studentCountry: s.student?.country ?? undefined,
+    studentCountry:  s.student?.country ?? undefined,
+    whatsappGroupId: s.student?.whatsapp_group_id ?? undefined,
   })
 
   await supabase.from('session_reminder_log').insert({
