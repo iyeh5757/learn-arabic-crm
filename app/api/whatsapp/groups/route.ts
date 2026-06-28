@@ -26,15 +26,20 @@ export async function GET() {
   }
 
   try {
+    // getParticipants is a required query param on Evolution v2
     const res = await fetch(
-      `${API_URL}/group/fetchAllGroups/${INSTANCE}`,
+      `${API_URL}/group/fetchAllGroups/${INSTANCE}?getParticipants=true`,
       { headers: { apikey: API_KEY } }
     )
+    const raw = await res.text()
     let json: any = null
-    try { json = await res.json() } catch { /* non-JSON body */ }
+    try { json = JSON.parse(raw) } catch { /* non-JSON body */ }
     if (!res.ok) {
-      const msg = json?.message ?? json?.error ?? (typeof json === 'string' ? json : null) ?? `HTTP ${res.status}`
-      return NextResponse.json({ error: msg }, { status: 400 })
+      // Evolution nests the real reason in response.message (often an array)
+      const detail = json?.response?.message ?? json?.message ?? json?.error
+      const msg = (Array.isArray(detail) ? detail.join('; ') : detail)
+        ?? (raw ? raw.slice(0, 300) : `HTTP ${res.status}`)
+      return NextResponse.json({ error: msg, status: res.status }, { status: 400 })
     }
 
     const list = Array.isArray(json) ? json : (json?.groups ?? json?.data ?? [])
