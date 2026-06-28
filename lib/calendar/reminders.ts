@@ -38,16 +38,14 @@ function pickReminder(s: SessionRow, now: Date): {
   fields: string[]
 } | null {
   const hoursUntil = (new Date(s.start_at).getTime() - now.getTime()) / 3_600_000
-  if (hoursUntil <= 0 || hoursUntil > 24.5) return null
+  // Only 12-hour and 1-hour reminders (24-hour reminder removed)
+  if (hoursUntil <= 0 || hoursUntil > 12.5) return null
 
   if (hoursUntil <= 1.5 && !s.reminder_1h_sent) {
     return { label: '1 hour', fields: ['reminder_24h_sent', 'reminder_12h_sent', 'reminder_1h_sent'] }
   }
   if (hoursUntil <= 12.5 && !s.reminder_12h_sent) {
     return { label: '12 hours', fields: ['reminder_24h_sent', 'reminder_12h_sent'] }
-  }
-  if (hoursUntil <= 24.5 && !s.reminder_24h_sent) {
-    return { label: '24 hours', fields: ['reminder_24h_sent'] }
   }
   return null
 }
@@ -105,7 +103,7 @@ export async function processSessionReminders(): Promise<{
 }> {
   const supabase = createAdminClient()   // cron has no user — bypass RLS safely
   const now = new Date()
-  const horizon = new Date(now.getTime() + 25 * 3_600_000).toISOString()
+  const horizon = new Date(now.getTime() + 13 * 3_600_000).toISOString()
 
   const { data: sessions, error } = await supabase
     .from('calendar_sessions')
