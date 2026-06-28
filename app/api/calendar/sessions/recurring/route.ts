@@ -1,11 +1,15 @@
 // app/api/calendar/sessions/recurring/route.ts
-// Generates real sessions for a recurring schedule: one occurrence per selected
-// weekday over N weeks. Shares a single Meet link across the series (same
-// student + teacher), creates a calendar event per occurrence, and a CRM row.
+// Generates real sessions for a recurring schedule: one CRM row per occurrence,
+// plus ONE native recurring Google Calendar event (RRULE) for the whole series.
+// This shows every occurrence in Google Calendar, shares a single Meet link, and
+// costs just one Calendar API call (so it never hits the usage quota).
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { createMeetSpace, createCalendarEventWithLink, isGoogleConfigured } from '@/lib/calendar/google'
 import { remindSessionIfDue } from '@/lib/calendar/reminders'
+
+// Map JS weekday (0=Sun..6=Sat) to RRULE BYDAY codes
+const RRULE_DAYS = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA']
 
 export const runtime = 'nodejs'
 export const maxDuration = 300
@@ -100,33 +104,40 @@ export async function POST(req: Request) {
     } catch (e: any) { console.error('[Recurring] meet space failed:', e?.message) }
   }
 
-  // Create a session (+ calendar event) per occurrence.
-  // Only the FIRST occurrence gets a Google Calendar event (to send the email
-  // invite and anchor the series). Later occurrences share the same Meet link
-  // stored in the CRM — creating one Calendar event per occurrence burns API
-  // quota and floods the student's Google Calendar.
+  // Create ONE native recurring Google Calendar event (RRULE) for the whole
+  // series — one API call, all occurrences visible in Google Calendar, one
+  // shared Meet link. The same master event ID is stored on every CRM row so
+  // single-occurrence cancel / reschedule can target just that instance.
   const summary = `${typeName} — ${student_name ?? 'Student'} with ${teacherName}`
+  let masterEventId: string | null = null
+  if (meetLink && isGoogleConfigured()) {
+    const byday = [...days_of_week].sort((a: number, b: number) => a - b).map((d: number) => RRULE_DAYS[d]).join(',')
+    let rrule = `RRULE:FREQ=WEEKLY;BYDAY=${byday}`
+    if (untilDate) {
+      // UNTIL = end of the until_date (UTC basic format)
+      const u = new Date(untilDate + 'T23:59:59Z')
+      rrule += `;UNTIL=${u.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')}`
+    }
+    try {
+      const ev = await createCalendarEventWithLink(
+        { summary, description: notes ?? '', startIso: occurrences[0].startIso, endIso: occurrences[0].endIso, timezone: TZ, attendees: [student_email, teacherEmail].filter(Boolean) },
+        meetLink, 'all', [rrule],
+      )
+      masterEventId = ev?.eventId ?? null
+    } catch (e: any) { console.error('[Recurring] recurring calendar event failed:', e?.message) }
+  }
+
+  // Create one CRM row per occurrence (drives reminders + conflict checks).
   let created = 0
   for (let i = 0; i < occurrences.length; i++) {
     const occ = occurrences[i]
-    let googleEventId: string | null = null
-    if (i === 0 && meetLink && isGoogleConfigured()) {
-      try {
-        const ev = await createCalendarEventWithLink(
-          { summary, description: notes ?? '', startIso: occ.startIso, endIso: occ.endIso, timezone: TZ, attendees: [student_email, teacherEmail].filter(Boolean) },
-          meetLink, 'all',
-        )
-        googleEventId = ev?.eventId ?? null
-      } catch (e: any) { console.error('[Recurring] calendar event failed:', e?.message) }
-    }
-
     const { data: row, error } = await supabase.from('calendar_sessions').insert({
       session_type_id: session_type_id || null, teacher_id, student_id: student_id || null,
       student_name, student_email, student_phone,
       start_at: occ.startIso, end_at: occ.endIso, duration_minutes, notes: notes ?? null,
       recurring_rule_id: rule?.id ?? null, is_recurring_root: i === 0,
-      google_event_id: googleEventId, google_meet_link: meetLink,
-      google_synced_at: googleEventId ? new Date().toISOString() : null,
+      google_event_id: masterEventId, google_meet_link: meetLink,
+      google_synced_at: masterEventId ? new Date().toISOString() : null,
       created_by: user.id,
     }).select('id').single()
     if (!error && row) {

@@ -196,7 +196,8 @@ export async function addMeetCoHosts(
 // (made via the Meet API). First tries to attach it as a real conference so the
 // native "Join with Google Meet" button shows; falls back to a description link.
 export async function createCalendarEventWithLink(
-  input: CreateEventInput, meetLink: string, sendUpdates: 'all' | 'none' = 'all'
+  input: CreateEventInput, meetLink: string, sendUpdates: 'all' | 'none' = 'all',
+  recurrence?: string[]   // e.g. ['RRULE:FREQ=WEEKLY;BYDAY=MO,WE,FR'] for a recurring series
 ): Promise<CreatedEvent | null> {
   if (!isGoogleConfigured()) return null
   const token = await getAccessToken()
@@ -209,6 +210,7 @@ export async function createCalendarEventWithLink(
     end:   { dateTime: input.endIso,   timeZone: input.timezone },
     attendees: input.attendees.filter(Boolean).map(email => ({ email })),
   }
+  if (recurrence && recurrence.length) base.recurrence = recurrence
   const calBase = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CALENDAR_ID)}/events`
 
   // Attempt 1: attach as a native conference (shows the Join button)
@@ -238,6 +240,72 @@ export async function createCalendarEventWithLink(
   const json = await res.json()
   if (!res.ok) throw new Error(json.error?.message ?? 'Google Calendar create failed')
   return { eventId: json.id, meetLink, htmlLink: json.htmlLink ?? null }
+}
+
+// ── Recurring-series instance helpers ──────────────────────────────────────
+// A recurring event has one master ID; each occurrence is an "instance" with
+// its own instance ID. These let us cancel / move a single occurrence, or
+// truncate the whole series, without touching the others.
+
+// Find the instance ID of one occurrence of a recurring event by its start time.
+async function getInstanceId(recurringEventId: string, startIso: string): Promise<string | null> {
+  if (!isGoogleConfigured() || !recurringEventId) return null
+  const token = await getAccessToken()
+  const t = new Date(startIso).getTime()
+  const timeMin = new Date(t - 60_000).toISOString()
+  const timeMax = new Date(t + 60_000).toISOString()
+  const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CALENDAR_ID)}/events/${encodeURIComponent(recurringEventId)}/instances?timeMin=${encodeURIComponent(timeMin)}&timeMax=${encodeURIComponent(timeMax)}`
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+  if (!res.ok) return null
+  const json = await res.json()
+  return json.items?.[0]?.id ?? null
+}
+
+// Cancel a single occurrence of a recurring event (leaves the rest intact).
+export async function cancelRecurringInstance(recurringEventId: string, startIso: string): Promise<void> {
+  if (!isGoogleConfigured() || !recurringEventId) return
+  const instId = await getInstanceId(recurringEventId, startIso)
+  if (instId) await deleteCalendarEvent(instId)
+}
+
+// Move a single occurrence of a recurring event to a new time.
+export async function rescheduleRecurringInstance(
+  recurringEventId: string, oldStartIso: string, newStartIso: string, newEndIso: string, timezone: string
+): Promise<void> {
+  if (!isGoogleConfigured() || !recurringEventId) return
+  const instId = await getInstanceId(recurringEventId, oldStartIso)
+  if (instId) await updateCalendarEventTime(instId, newStartIso, newEndIso, timezone)
+}
+
+// Format a Date as an RRULE UNTIL value (UTC basic format: YYYYMMDDTHHMMSSZ).
+function rruleUntil(d: Date): string {
+  return d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z')
+}
+
+// Truncate a recurring series so occurrences from `fromIso` onward are removed
+// (used for "this and future" cancellation). One API call; handles never-ending.
+export async function truncateRecurringSeries(recurringEventId: string, fromIso: string): Promise<void> {
+  if (!isGoogleConfigured() || !recurringEventId) return
+  const token = await getAccessToken()
+  const calBase = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(CALENDAR_ID)}/events`
+  // Read current recurrence rules
+  const getRes = await fetch(`${calBase}/${encodeURIComponent(recurringEventId)}`, { headers: { Authorization: `Bearer ${token}` } })
+  if (!getRes.ok) return
+  const ev = await getRes.json()
+  const rules: string[] = ev.recurrence ?? []
+  if (!rules.some(r => r.startsWith('RRULE'))) return
+  const until = rruleUntil(new Date(new Date(fromIso).getTime() - 1000))   // 1s before the cut occurrence
+  const newRules = rules.map(r => {
+    if (!r.startsWith('RRULE')) return r
+    const parts = r.replace(/^RRULE:/, '').split(';').filter(p => p && !/^UNTIL=/i.test(p) && !/^COUNT=/i.test(p))
+    parts.push(`UNTIL=${until}`)
+    return `RRULE:${parts.join(';')}`
+  })
+  await fetch(`${calBase}/${encodeURIComponent(recurringEventId)}?sendUpdates=all`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ recurrence: newRules }),
+  })
 }
 
 export interface FetchedEvent {

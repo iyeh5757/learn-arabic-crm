@@ -1,7 +1,10 @@
 // app/api/calendar/sessions/[id]/route.ts
 import { createClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
-import { deleteCalendarEvent, updateCalendarEventTime } from '@/lib/calendar/google'
+import {
+  deleteCalendarEvent, updateCalendarEventTime,
+  cancelRecurringInstance, rescheduleRecurringInstance, truncateRecurringSeries,
+} from '@/lib/calendar/google'
 
 export const runtime = 'nodejs'
 export const maxDuration = 120
@@ -15,6 +18,23 @@ async function targetSessions(supabase: any, base: any, scope: string) {
   if (scope === 'future') q = q.gte('start_at', base.start_at)
   const { data } = await q
   return data ?? [base]
+}
+
+// Sync a cancel/delete to Google. Recurring rows all share one master event ID,
+// so we act on the master (delete whole series), the series tail (truncate), or a
+// single instance — depending on scope — instead of deleting the master N times.
+async function googleSyncRemoval(base: any, scope: string) {
+  const eid = base.google_event_id
+  if (!eid) return
+  try {
+    if (!base.recurring_rule_id || scope === 'all') {
+      await deleteCalendarEvent(eid)                          // single event, or whole series
+    } else if (scope === 'future') {
+      await truncateRecurringSeries(eid, base.start_at)       // this occurrence onward
+    } else {
+      await cancelRecurringInstance(eid, base.start_at)       // just this occurrence
+    }
+  } catch (e: any) { console.error('[Calendar] removal sync:', e?.message) }
 }
 
 // PATCH — cancel / reschedule (single, or scoped across a recurring series)
@@ -42,8 +62,14 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
     const { data, error } = await supabase.from('calendar_sessions').update(update).eq('id', params.id).select().single()
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     if (existing.google_event_id) {
-      try { await updateCalendarEventTime(existing.google_event_id, start_at, end_at, 'Africa/Cairo') }
-      catch (e: any) { console.error('[Calendar] Google reschedule failed:', e?.message) }
+      try {
+        if (existing.recurring_rule_id) {
+          // Move just this occurrence of the series, not the whole series
+          await rescheduleRecurringInstance(existing.google_event_id, existing.start_at, start_at, end_at, 'Africa/Cairo')
+        } else {
+          await updateCalendarEventTime(existing.google_event_id, start_at, end_at, 'Africa/Cairo')
+        }
+      } catch (e: any) { console.error('[Calendar] Google reschedule failed:', e?.message) }
     }
     await supabase.from('calendar_audit_log').insert({ event_id: params.id, action: 'rescheduled', performed_by: user.id, old_data: existing, new_data: data, source: 'crm' })
     return NextResponse.json(data)
@@ -52,11 +78,7 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   // Cancel (optionally scoped across the recurring series)
   if (status === 'cancelled') {
     const rows = await targetSessions(supabase, existing, scope)
-    for (const r of rows) {
-      if (r.google_event_id) {
-        try { await deleteCalendarEvent(r.google_event_id) } catch (e: any) { console.error('[Calendar] cancel sync:', e?.message) }
-      }
-    }
+    await googleSyncRemoval(existing, scope)
     const ids = rows.map((r: any) => r.id)
     await supabase.from('calendar_sessions').update({ status: 'cancelled', updated_by: user.id, updated_at: new Date().toISOString() }).in('id', ids)
     // Stop a recurring series from generating more when cancelling future/all
@@ -88,11 +110,7 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
   if (!existing) return NextResponse.json({ error: 'Session not found' }, { status: 404 })
 
   const rows = await targetSessions(supabase, existing, scope)
-  for (const r of rows) {
-    if (r.google_event_id) {
-      try { await deleteCalendarEvent(r.google_event_id) } catch (e: any) { console.error('[Calendar] delete sync:', e?.message) }
-    }
-  }
+  await googleSyncRemoval(existing, scope)
   const ids = rows.map((r: any) => r.id)
   const { error } = await supabase.from('calendar_sessions').delete().in('id', ids)
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })

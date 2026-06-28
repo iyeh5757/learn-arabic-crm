@@ -64,17 +64,17 @@ async function topUpOne(supabase: any, rule: any): Promise<number> {
     if (existingTimes.has(start.getTime())) continue
     const end = new Date(start.getTime() + rule.duration_minutes * 60000)
 
-    // Do NOT create individual Calendar events for extended occurrences.
-    // The student was already invited via the first occurrence and has the Meet
-    // link in the CRM. Creating one event per top-up occurrence burns Calendar
-    // API quota (quota is shared; exhausting it blocks all bookings).
+    // No new Calendar API call here: the native recurring Google event already
+    // covers all future dates. We just link each CRM row to that master event
+    // (tmpl.google_event_id) and carry the shared Meet link so single-occurrence
+    // cancel / reschedule can target the right instance.
     await supabase.from('calendar_sessions').insert({
       session_type_id: tmpl.session_type_id, teacher_id: tmpl.teacher_id, student_id: tmpl.student_id,
       student_name: tmpl.student_name, student_email: tmpl.student_email, student_phone: tmpl.student_phone,
       start_at: start.toISOString(), end_at: end.toISOString(), duration_minutes: rule.duration_minutes,
       notes: tmpl.notes, recurring_rule_id: rule.id,
-      google_event_id: null, google_meet_link: tmpl.google_meet_link,
-      google_synced_at: null,
+      google_event_id: tmpl.google_event_id ?? null, google_meet_link: tmpl.google_meet_link,
+      google_synced_at: tmpl.google_event_id ? new Date().toISOString() : null,
       created_by: tmpl.created_by,
     })
     existingTimes.add(start.getTime())
