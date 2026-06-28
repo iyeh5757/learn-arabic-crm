@@ -24,33 +24,36 @@ export async function POST(_req: Request, { params }: { params: { id: string } }
       id, student_name, student_phone, start_at, duration_minutes, google_meet_link,
       session_type:session_type_config(name),
       teacher:teachers(profile:profiles!teachers_user_id_fkey(name)),
-      student:students(country)
+      student:students(country, whatsapp_group_id)
     `)
     .eq('id', params.id)
     .single()
 
   if (!s) return NextResponse.json({ error: 'Session not found' }, { status: 404 })
-  if (!s.student_phone) {
-    return NextResponse.json({ error: 'This student has no phone number saved.' }, { status: 400 })
+
+  const groupId = (s.student as any)?.whatsapp_group_id ?? undefined
+  if (!s.student_phone && !groupId) {
+    return NextResponse.json({ error: 'This student has no phone number or WhatsApp group ID saved.' }, { status: 400 })
   }
 
-  const result = await sendWhatsAppReminder(s.student_phone, {
+  const result = await sendWhatsAppReminder(s.student_phone ?? '', {
     studentName:  s.student_name ?? 'Student',
     teacherName:  (s.teacher as any)?.profile?.name ?? 'your teacher',
     sessionType:  (s.session_type as any)?.name ?? 'Arabic',
     startAt:      new Date(s.start_at),
     durationMins: s.duration_minutes,
     meetLink:     s.google_meet_link ?? undefined,
-    hoursBeforeLabel: '24 hours',
+    hoursBeforeLabel: '12 hours',
     studentCountry: (s.student as any)?.country ?? undefined,
+    whatsappGroupId: groupId,
   })
 
   // log it
   await supabase.from('session_reminder_log').insert({
     session_id:   s.id,
-    hours_before: 24,
+    hours_before: 12,
     channel:      'whatsapp',
-    sent_to:      s.student_phone,
+    sent_to:      groupId ?? s.student_phone,
     status:       result.success ? 'sent' : 'failed',
     error:        result.error ?? null,
   })

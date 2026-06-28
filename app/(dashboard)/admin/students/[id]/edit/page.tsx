@@ -12,12 +12,15 @@ function BrowseGroupsModal({ onSelect, onClose }: { onSelect: (id: string) => vo
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
 
-  useEffect(() => {
-    fetch('/api/whatsapp/groups')
+  function load(refresh = false) {
+    setLoading(true); setError('')
+    fetch(`/api/whatsapp/groups${refresh ? '?refresh=1' : ''}`)
       .then(r => r.json())
       .then(d => { if (d.error) setError(d.error); else setGroups(d); setLoading(false) })
       .catch(e => { setError(e.message); setLoading(false) })
-  }, [])
+  }
+
+  useEffect(() => { load(false) }, [])
 
   const filtered = groups.filter(g => g.name.toLowerCase().includes(search.toLowerCase()))
 
@@ -28,9 +31,13 @@ function BrowseGroupsModal({ onSelect, onClose }: { onSelect: (id: string) => vo
           <div style={{ fontWeight: 700, fontSize: '16px' }}>📱 Browse WhatsApp Groups</div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: '#6B7280' }}>✕</button>
         </div>
-        <div style={{ padding: '14px 22px', borderBottom: '1px solid #F3F4F6' }}>
+        <div style={{ padding: '14px 22px', borderBottom: '1px solid #F3F4F6', display: 'flex', gap: '10px', alignItems: 'center' }}>
           <input placeholder="Search groups…" value={search} onChange={e => setSearch(e.target.value)}
-            style={{ width: '100%', padding: '8px 12px', border: '1.5px solid #E5E7EB', borderRadius: '8px', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
+            style={{ flex: 1, padding: '8px 12px', border: '1.5px solid #E5E7EB', borderRadius: '8px', fontSize: '14px', outline: 'none', boxSizing: 'border-box' }} />
+          <button type="button" onClick={() => load(true)} disabled={loading} title="Re-fetch from WhatsApp (use after creating a new group)"
+            style={{ whiteSpace: 'nowrap', background: '#F0FDF4', color: '#065F46', border: '1px solid #BBF7D0', padding: '8px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer' }}>
+            ↻ Refresh
+          </button>
         </div>
         <div style={{ overflowY: 'auto', flex: 1 }}>
           {loading && <div style={{ padding: '32px', textAlign: 'center', color: '#6B7280' }}>Loading groups…</div>}
