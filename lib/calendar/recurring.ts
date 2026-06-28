@@ -73,8 +73,8 @@ async function topUpOne(supabase: any, rule: any): Promise<number> {
       student_name: tmpl.student_name, student_email: tmpl.student_email, student_phone: tmpl.student_phone,
       start_at: start.toISOString(), end_at: end.toISOString(), duration_minutes: rule.duration_minutes,
       notes: tmpl.notes, recurring_rule_id: rule.id,
-      google_event_id: googleEventId, google_meet_link: tmpl.google_meet_link,
-      google_synced_at: googleEventId ? new Date().toISOString() : null,
+      google_event_id: null, google_meet_link: tmpl.google_meet_link,
+      google_synced_at: null,
       created_by: tmpl.created_by,
     })
     existingTimes.add(start.getTime())
