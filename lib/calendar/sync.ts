@@ -20,7 +20,7 @@ export async function syncFromGoogle(): Promise<{
 
   const { data: sessions } = await supabase
     .from('calendar_sessions')
-    .select('id, google_event_id, start_at, end_at, status')
+    .select('id, google_event_id, start_at, end_at, status, recurring_rule_id')
     .not('google_event_id', 'is', null)
     .in('status', ['scheduled', 'rescheduled'])
     .gte('end_at', cutoff)
@@ -40,6 +40,11 @@ export async function syncFromGoogle(): Promise<{
       })
       await supabase.from('calendar_sessions').delete().eq('id', s.id)
       removed++
+    } else if (s.recurring_rule_id) {
+      // Recurring occurrences all share ONE master event ID, so the master's
+      // time does NOT represent this individual occurrence — skip the reschedule
+      // comparison (it would wrongly reset every occurrence to the master's date).
+      skipped++
     } else if (ev.startIso && ev.endIso) {
       const newStart = new Date(ev.startIso).toISOString()
       const newEnd   = new Date(ev.endIso).toISOString()
