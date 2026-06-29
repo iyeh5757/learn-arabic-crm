@@ -15,7 +15,8 @@ export const runtime = 'nodejs'
 export const maxDuration = 300
 
 const TZ = 'Africa/Cairo'
-const MAX_OCCURRENCES = 60
+const HORIZON_WEEKS = 52          // generate up to ~1 year ahead at booking time
+const MAX_OCCURRENCES = 420       // safety cap (covers daily classes for a year)
 
 function tzOffsetMinutes(date: Date): number {
   const dtf = new Intl.DateTimeFormat('en-US', { timeZone: TZ, hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -49,10 +50,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Missing required fields for recurring booking' }, { status: 400 })
   }
 
-  // Book a small initial horizon now (keeps booking fast); the hourly cron
-  // extends active series to ~8 weeks ahead afterwards (and rolls "never ends").
-  const INITIAL_WEEKS = 3
-  const genWeeks = never_end ? INITIAL_WEEKS : Math.min(weeks, INITIAL_WEEKS)
+  // Generate the full horizon now (up to ~1 year) so the series immediately
+  // shows far ahead. Never-ending uses the full year; fixed series use their
+  // selected number of weeks. The hourly cron keeps never-ending series rolling.
+  const genWeeks = never_end ? HORIZON_WEEKS : Math.min(weeks, HORIZON_WEEKS)
 
   // until_date: null = never-ending; otherwise start_date + weeks
   let untilDate: string | null = null
@@ -128,21 +129,26 @@ export async function POST(req: Request) {
   }
 
   // Create one CRM row per occurrence (drives reminders + conflict checks).
-  let created = 0
-  for (let i = 0; i < occurrences.length; i++) {
-    const occ = occurrences[i]
-    const { data: row, error } = await supabase.from('calendar_sessions').insert({
-      session_type_id: session_type_id || null, teacher_id, student_id: student_id || null,
-      student_name, student_email, student_phone,
-      start_at: occ.startIso, end_at: occ.endIso, duration_minutes, notes: notes ?? null,
-      recurring_rule_id: rule?.id ?? null, is_recurring_root: i === 0,
-      google_event_id: masterEventId, google_meet_link: meetLink,
-      google_synced_at: masterEventId ? new Date().toISOString() : null,
-      created_by: user.id,
-    }).select('id').single()
-    if (!error && row) {
-      created++
-      try { await remindSessionIfDue(supabase, row.id) } catch {}
+  // Batch the insert so generating a full year stays fast.
+  const nowMs = Date.now()
+  const syncedAt = masterEventId ? new Date().toISOString() : null
+  const rows = occurrences.map((occ, i) => ({
+    session_type_id: session_type_id || null, teacher_id, student_id: student_id || null,
+    student_name, student_email, student_phone,
+    start_at: occ.startIso, end_at: occ.endIso, duration_minutes, notes: notes ?? null,
+    recurring_rule_id: rule?.id ?? null, is_recurring_root: i === 0,
+    google_event_id: masterEventId, google_meet_link: meetLink,
+    google_synced_at: syncedAt,
+    created_by: user.id,
+  }))
+  const { data: inserted, error: insErr } = await supabase.from('calendar_sessions').insert(rows).select('id, start_at')
+  if (insErr) return NextResponse.json({ error: `Could not create sessions: ${insErr.message}` }, { status: 400 })
+  const created = inserted?.length ?? 0
+
+  // Fire reminders only for occurrences within the next ~13h (rest are far future).
+  for (const r of inserted ?? []) {
+    if (new Date(r.start_at).getTime() - nowMs <= 13 * 3_600_000) {
+      try { await remindSessionIfDue(supabase, r.id) } catch {}
     }
   }
 
