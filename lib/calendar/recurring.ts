@@ -1,13 +1,13 @@
 // lib/calendar/recurring.ts
 // Rolling generation for recurring schedules. Keeps every active rule topped up
-// with sessions ~8 weeks ahead, so "never-ending" series never run out. Fixed
-// series stop at their until_date.
+// with sessions ~1 year ahead, so "never-ending" series always show far into the
+// future (the CRM needs a real row per occurrence; Google Calendar itself is
+// truly infinite via the native RRULE). Fixed series stop at their until_date.
 
 import { createAdminClient } from '@/lib/supabase/admin'
-import { isGoogleConfigured } from './google'
 
 const TZ = 'Africa/Cairo'
-const HORIZON_WEEKS = 8
+const HORIZON_WEEKS = 52   // materialise CRM rows up to ~1 year ahead (rolling)
 
 function tzOffsetMinutes(date: Date): number {
   const dtf = new Intl.DateTimeFormat('en-US', { timeZone: TZ, hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' })
@@ -55,20 +55,21 @@ async function topUpOne(supabase: any, rule: any): Promise<number> {
   const days: number[] = rule.days_of_week ?? []
   const timeHHmm = (rule.start_time ?? '00:00').slice(0, 5)
 
-  let created = 0
+  // No new Calendar API call here: the native recurring Google event already
+  // covers all future dates. We just link each CRM row to that master event
+  // (tmpl.google_event_id) and carry the shared Meet link so single-occurrence
+  // cancel / reschedule can target the right instance.
+  const rows: any[] = []
   const cursor = new Date(tmpl.start_at); cursor.setHours(0, 0, 0, 0); cursor.setDate(cursor.getDate() + 1)
-  for (let guard = 0; cursor <= endCap && guard < 130; guard++, cursor.setDate(cursor.getDate() + 1)) {
+  // guard generously covers a full year ahead even when the template is already
+  // weeks out (loop is day-by-day from the latest existing occurrence).
+  for (let guard = 0; cursor <= endCap && guard < 420; guard++, cursor.setDate(cursor.getDate() + 1)) {
     if (!days.includes(cursor.getDay())) continue
     const start = cairoToUtc(fmtDate(cursor), timeHHmm)
     if (start.getTime() < Date.now()) continue
     if (existingTimes.has(start.getTime())) continue
     const end = new Date(start.getTime() + rule.duration_minutes * 60000)
-
-    // No new Calendar API call here: the native recurring Google event already
-    // covers all future dates. We just link each CRM row to that master event
-    // (tmpl.google_event_id) and carry the shared Meet link so single-occurrence
-    // cancel / reschedule can target the right instance.
-    await supabase.from('calendar_sessions').insert({
+    rows.push({
       session_type_id: tmpl.session_type_id, teacher_id: tmpl.teacher_id, student_id: tmpl.student_id,
       student_name: tmpl.student_name, student_email: tmpl.student_email, student_phone: tmpl.student_phone,
       start_at: start.toISOString(), end_at: end.toISOString(), duration_minutes: rule.duration_minutes,
@@ -78,7 +79,10 @@ async function topUpOne(supabase: any, rule: any): Promise<number> {
       created_by: tmpl.created_by,
     })
     existingTimes.add(start.getTime())
-    created++
   }
-  return created
+
+  if (rows.length === 0) return 0
+  const { error } = await supabase.from('calendar_sessions').insert(rows)   // one batched insert
+  if (error) { console.error('[Recurring] batch insert failed:', error.message); return 0 }
+  return rows.length
 }
