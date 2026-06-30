@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter, useParams } from 'next/navigation'
 
 import { COUNTRIES, COUNTRY_CURRENCY } from '@/lib/countries'
+import BrowseGroupsModal from '@/components/BrowseGroupsModal'
 
 export default function SalesEditStudentPage() {
   const router = useRouter()
@@ -16,6 +17,7 @@ export default function SalesEditStudentPage() {
   const [error, setError] = useState('')
   const [teachers, setTeachers] = useState<any[]>([])
   const [form, setForm] = useState<any>(null)
+  const [showGroups, setShowGroups] = useState(false)
 
   useEffect(() => {
     Promise.all([
@@ -166,6 +168,10 @@ export default function SalesEditStudentPage() {
                 placeholder="e.g. 120363XXXXXXXXXX@g.us"
                 value={form.whatsapp_group_id ?? ''}
                 onChange={e => setForm((f: any) => ({ ...f, whatsapp_group_id: e.target.value }))} />
+              <button type="button" onClick={() => setShowGroups(true)}
+                style={{ whiteSpace: 'nowrap', background: '#065F46', color: '#fff', padding: '9px 16px', borderRadius: '8px', border: 'none', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
+                Browse Groups
+              </button>
               {form.whatsapp_group_id && (
                 <button type="button" onClick={() => setForm((f: any) => ({ ...f, whatsapp_group_id: '' }))}
                   style={{ whiteSpace: 'nowrap', background: '#FEF2F2', color: '#DC2626', padding: '9px 14px', borderRadius: '8px', border: '1px solid #FECACA', fontSize: '13px', cursor: 'pointer' }}>
@@ -188,6 +194,13 @@ export default function SalesEditStudentPage() {
           <button type="button" onClick={() => router.back()} style={{ background: 'transparent', color: '#6B7280', padding: '12px 22px', borderRadius: '10px', border: '1.5px solid #E5E7EB', fontWeight: '500', fontSize: '14px', cursor: 'pointer' }}>Cancel</button>
         </div>
       </form>
+
+      {showGroups && (
+        <BrowseGroupsModal
+          onSelect={id => setForm((f: any) => ({ ...f, whatsapp_group_id: id }))}
+          onClose={() => setShowGroups(false)}
+        />
+      )}
     </div>
   )
 }

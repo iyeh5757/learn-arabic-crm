@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { COUNTRIES, COUNTRY_CURRENCY } from '@/lib/countries'
+import BrowseGroupsModal from '@/components/BrowseGroupsModal'
 
 const PRESET_CLASSES = [4, 8, 12, 16, 20]
 
@@ -23,6 +24,7 @@ export default function SalesNewStudentPage() {
   const [error, setError] = useState('')
   const [currentUserId, setCurrentUserId] = useState('')
   const [classMode, setClassMode] = useState<'preset'|'custom'>('preset')
+  const [showGroups, setShowGroups] = useState(false)
 
   const [form, setForm] = useState({
     name:'', email:'', phone:'', country:'',
@@ -30,7 +32,7 @@ export default function SalesNewStudentPage() {
     assigned_teacher_id:'', student_status:'trial',
     reminder_date:'', notes:'', payment_method:'',
     payment_status:'pending', number_of_classes:16,
-    custom_classes:'', amount:'',
+    custom_classes:'', amount:'', whatsapp_group_id:'',
   })
 
   useEffect(() => {
@@ -68,6 +70,7 @@ export default function SalesNewStudentPage() {
         payment_status: form.payment_status,
         reminder_date: form.reminder_date || null,
         notes: form.notes || null,
+        whatsapp_group_id: form.whatsapp_group_id || null,
         total_paid_classes: 0, consumed_classes: 0,
       }).select('id').single()
       if (err) throw new Error(err.message)
@@ -205,6 +208,36 @@ export default function SalesNewStudentPage() {
             <textarea style={{ ...inp, minHeight:'70px', resize:'vertical' }} value={form.notes} onChange={e=>setForm(f=>({...f,notes:e.target.value}))} placeholder="Any notes..." />
           </div>
         </div>
+
+        <div style={{ ...card, border:'1px solid #D1FAE5' }}>
+          <div style={{ ...cardH, background:'#F0FDF4', color:'#065F46' }}>💬 WhatsApp Group Reminders</div>
+          <div style={{ padding:'20px 22px' }}>
+            <p style={{ fontSize:'13px', color:'#6B7280', margin:'0 0 14px 0' }}>
+              When set, session reminders go to the student&apos;s WhatsApp group instead of their private number. Use Browse Groups to look it up.
+            </p>
+            <label style={lbl}>WhatsApp Group ID</label>
+            <div style={{ display:'flex', gap:'10px', alignItems:'center' }}>
+              <input style={{ ...inp, fontFamily:'monospace', fontSize:'13px' }}
+                placeholder="e.g. 120363XXXXXXXXXX@g.us"
+                value={form.whatsapp_group_id}
+                onChange={e=>setForm(f=>({...f, whatsapp_group_id:e.target.value}))} />
+              <button type="button" onClick={()=>setShowGroups(true)}
+                style={{ whiteSpace:'nowrap', background:'#065F46', color:'#fff', padding:'9px 16px', borderRadius:'8px', border:'none', fontSize:'13px', fontWeight:600, cursor:'pointer' }}>
+                Browse Groups
+              </button>
+              {form.whatsapp_group_id && (
+                <button type="button" onClick={()=>setForm(f=>({...f, whatsapp_group_id:''}))}
+                  style={{ whiteSpace:'nowrap', background:'#FEF2F2', color:'#DC2626', padding:'9px 14px', borderRadius:'8px', border:'1px solid #FECACA', fontSize:'13px', cursor:'pointer' }}>
+                  Clear
+                </button>
+              )}
+            </div>
+            {form.whatsapp_group_id && (
+              <p style={{ fontSize:'12px', color:'#059669', margin:'8px 0 0', fontWeight:600 }}>✅ Reminders will go to this group</p>
+            )}
+          </div>
+        </div>
+
         {error && <div style={{ background:'#FEF2F2', border:'1px solid #FECACA', color:'#DC2626', padding:'12px 16px', borderRadius:'8px', fontSize:'14px', marginBottom:'16px' }}>{error}</div>}
         <div style={{ display:'flex', gap:'12px' }}>
           <button type="submit" disabled={loading} style={{ background:'#0D1B2A', color:'#E8C97A', padding:'12px 28px', borderRadius:'10px', border:'none', fontWeight:'600', fontSize:'14px', cursor:loading?'not-allowed':'pointer', opacity:loading?0.7:1 }}>
@@ -213,6 +246,13 @@ export default function SalesNewStudentPage() {
           <button type="button" onClick={()=>router.back()} style={{ background:'transparent', color:'#6B7280', padding:'12px 22px', borderRadius:'10px', border:'1.5px solid #E5E7EB', fontWeight:'500', fontSize:'14px', cursor:'pointer' }}>Cancel</button>
         </div>
       </form>
+
+      {showGroups && (
+        <BrowseGroupsModal
+          onSelect={id => setForm(f => ({ ...f, whatsapp_group_id: id }))}
+          onClose={() => setShowGroups(false)}
+        />
+      )}
     </div>
   )
 }
