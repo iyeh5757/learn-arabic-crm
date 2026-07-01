@@ -47,7 +47,7 @@ export default async function SupervisorCalendarPage() {
           teachers={teachers}
           supervisors={[]}
           students={(students ?? []).map((s: any) => ({ id: s.id, name: s.name, email: s.email ?? '', phone: s.phone ?? '' }))}
-          canDelete={false}
+          canDelete={true}
           showSupervisorFilter={false}
         />
       )}
