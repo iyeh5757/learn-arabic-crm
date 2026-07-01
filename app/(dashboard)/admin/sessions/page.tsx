@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import DeleteSessionLogButton from '@/components/DeleteSessionLogButton'
 
 export default function SessionsPage() {
   const supabase = createClient()
@@ -114,7 +115,11 @@ export default function SessionsPage() {
                     <td style={{ padding: '12px 16px', fontSize: '13px' }}>{s.student_rating ? '⭐'.repeat(s.student_rating) : '—'}</td>
                     <td style={{ padding: '12px 16px', fontSize: '13px' }}>{s.homework ? '✅' : '—'}</td>
                     <td style={{ padding: '12px 16px' }}>
-                      <Link href={`/admin/sessions/${s.id}/edit`} style={{ background: '#0D1B2A', color: '#E8C97A', padding: '5px 12px', borderRadius: '6px', textDecoration: 'none', fontSize: '12px', fontWeight: '600' }}>Edit</Link>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <Link href={`/admin/sessions/${s.id}/edit`} style={{ background: '#0D1B2A', color: '#E8C97A', padding: '5px 12px', borderRadius: '6px', textDecoration: 'none', fontSize: '12px', fontWeight: '600' }}>Edit</Link>
+                        <DeleteSessionLogButton sessionId={s.id} studentName={s.student?.name}
+                          onDeleted={id => setSessions(prev => prev.filter(x => x.id !== id))} />
+                      </div>
                     </td>
                   </tr>
                 )

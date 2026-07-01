@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
+import DeleteSessionLogButton from '@/components/DeleteSessionLogButton'
 
 export default function SupervisorSessionsPage() {
   const supabase = createClient()
@@ -150,9 +151,13 @@ export default function SupervisorSessionsPage() {
                         </span>
                       </td>
                       <td style={{ padding: '12px 14px' }}>
-                        <Link href={`/supervisor/sessions/${s.id}/edit`} style={{ padding: '4px 10px', background: '#EFF6FF', color: '#2563EB', borderRadius: '6px', fontSize: '11px', fontWeight: '600', textDecoration: 'none' }}>
-                          Edit
-                        </Link>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <Link href={`/supervisor/sessions/${s.id}/edit`} style={{ padding: '4px 10px', background: '#EFF6FF', color: '#2563EB', borderRadius: '6px', fontSize: '11px', fontWeight: '600', textDecoration: 'none' }}>
+                            Edit
+                          </Link>
+                          <DeleteSessionLogButton sessionId={s.id} studentName={s.student?.name}
+                            onDeleted={id => setSessions(prev => prev.filter(x => x.id !== id))} />
+                        </div>
                       </td>
                     </tr>
                   )

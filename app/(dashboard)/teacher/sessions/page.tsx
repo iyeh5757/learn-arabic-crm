@@ -2,6 +2,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import DeleteSessionLogButton from '@/components/DeleteSessionLogButton'
 
 export default async function TeacherSessionsPage() {
   const supabase = createClient()
@@ -65,7 +66,10 @@ export default async function TeacherSessionsPage() {
                     <td style={{ padding: '12px 16px', fontSize: '13px' }}>{s.student_rating ? '⭐'.repeat(s.student_rating) : '—'}</td>
                     <td style={{ padding: '12px 16px', fontSize: '13px' }}>{s.homework ? '✅' : '—'}</td>
                     <td style={{ padding: '12px 16px' }}>
-                      <Link href={`/teacher/sessions/${s.id}/edit`} style={{ background: '#0D1B2A', color: '#E8C97A', padding: '5px 12px', borderRadius: '6px', textDecoration: 'none', fontSize: '12px', fontWeight: '600' }}>Edit</Link>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        <Link href={`/teacher/sessions/${s.id}/edit`} style={{ background: '#0D1B2A', color: '#E8C97A', padding: '5px 12px', borderRadius: '6px', textDecoration: 'none', fontSize: '12px', fontWeight: '600' }}>Edit</Link>
+                        <DeleteSessionLogButton sessionId={s.id} studentName={s.student?.name} />
+                      </div>
                     </td>
                   </tr>
                 )
