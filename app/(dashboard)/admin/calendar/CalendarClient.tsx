@@ -79,7 +79,7 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
   const [studentQuery, setStudentQuery] = useState('')
   const [showStudentList, setShowStudentList] = useState(false)
   const [loadError, setLoadError] = useState('')
-  const [resched, setResched] = useState<null | { date: string; time: string; duration: number }>(null)
+  const [resched, setResched] = useState<null | { date: string; time: string; duration: number; teacher_id: string; teacherFuture: boolean }>(null)
   const filterTeacherRef    = useRef('')
   const filterSupervisorRef = useRef('')
   const mineRef             = useRef(false)
@@ -264,7 +264,7 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
 
   function startReschedule() {
     if (!selected) return
-    // pre-fill with the session's current Cairo date/time
+    // pre-fill with the session's current Cairo date/time + teacher
     const d = new Date(selected.start_at)
     const parts = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'Africa/Cairo', year: 'numeric', month: '2-digit', day: '2-digit',
@@ -276,6 +276,8 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
       date: `${m.year}-${m.month}-${m.day}`,
       time: `${m.hour === '24' ? '00' : m.hour}:${m.minute}`,
       duration: selected.duration_minutes,
+      teacher_id: selected.teacher?.id ?? '',
+      teacherFuture: false,
     })
   }
 
@@ -290,6 +292,8 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
         start_at: start.toISOString(),
         end_at:   end.toISOString(),
         duration_minutes: resched.duration,
+        teacher_id: resched.teacher_id || undefined,
+        teacher_scope: resched.teacherFuture ? 'future' : 'one',
       }),
     })
     setBusy(false)
@@ -299,7 +303,7 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
       if (api) { api.gotoDate(start); api.refetchEvents() }
     } else {
       const d = await res.json()
-      alert(`Failed to reschedule: ${d?.error ?? 'unknown error'}`)
+      alert(`Failed to save changes: ${d?.error ?? 'unknown error'}`)
     }
   }
 
@@ -492,29 +496,55 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
               )}
             </div>
 
-            {/* Reschedule form */}
+            {/* Edit panel — reassign teacher and/or change time */}
             {selected.status !== 'cancelled' && resched && (
               <div style={{ padding: '0 22px 16px' }}>
-                <div style={{ background: '#F8FAFC', borderRadius: '12px', padding: '14px' }}>
-                  <div style={{ fontSize: '12px', fontWeight: '700', color: '#334155', marginBottom: '10px' }}>🕑 Move session to a new time</div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '8px' }}>
-                    <input type="date" value={resched.date} onChange={e => setResched(r => r && { ...r, date: e.target.value })}
-                      style={{ padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: '9px', fontSize: '13px', outline: 'none' }} />
-                    <input type="time" value={resched.time} onChange={e => setResched(r => r && { ...r, time: e.target.value })}
-                      style={{ padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: '9px', fontSize: '13px', outline: 'none' }} />
+                <div style={{ background: '#F8FAFC', borderRadius: '14px', padding: '16px' }}>
+                  <div style={{ fontSize: '13px', fontWeight: '800', color: '#0F172A', marginBottom: '12px' }}>✏️ Edit session</div>
+
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ ...label, marginBottom: '4px' }}>Teacher</label>
+                    <select value={resched.teacher_id} onChange={e => setResched(r => r && { ...r, teacher_id: e.target.value })}
+                      style={{ width: '100%', padding: '9px 10px', border: '1px solid #E2E8F0', borderRadius: '10px', fontSize: '13px', outline: 'none', background: '#fff' }}>
+                      {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                    {selected.recurring_rule_id && resched.teacher_id !== (selected.teacher?.id ?? '') && (
+                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px', fontSize: '12px', color: '#334155', cursor: 'pointer' }}>
+                        <input type="checkbox" checked={resched.teacherFuture} onChange={e => setResched(r => r && { ...r, teacherFuture: e.target.checked })} />
+                        Apply this teacher to all upcoming sessions in the series
+                      </label>
+                    )}
                   </div>
-                  <select value={resched.duration} onChange={e => setResched(r => r && { ...r, duration: Number(e.target.value) })}
-                    style={{ width: '100%', padding: '8px 10px', border: '1px solid #E2E8F0', borderRadius: '9px', fontSize: '13px', outline: 'none', marginBottom: '10px' }}>
-                    {[30, 40, 60, 90, 120].map(d => <option key={d} value={d}>{d} min</option>)}
-                  </select>
+
+                  <div style={{ marginBottom: '12px' }}>
+                    <label style={{ ...label, marginBottom: '4px' }}>Date &amp; time (Cairo)</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                      <input type="date" value={resched.date} onChange={e => setResched(r => r && { ...r, date: e.target.value })}
+                        style={{ padding: '9px 10px', border: '1px solid #E2E8F0', borderRadius: '10px', fontSize: '13px', outline: 'none' }} />
+                      <input type="time" value={resched.time} onChange={e => setResched(r => r && { ...r, time: e.target.value })}
+                        style={{ padding: '9px 10px', border: '1px solid #E2E8F0', borderRadius: '10px', fontSize: '13px', outline: 'none' }} />
+                    </div>
+                    {selected.recurring_rule_id && (
+                      <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '5px' }}>Time change applies to this session only.</div>
+                    )}
+                  </div>
+
+                  <div style={{ marginBottom: '14px' }}>
+                    <label style={{ ...label, marginBottom: '4px' }}>Duration</label>
+                    <select value={resched.duration} onChange={e => setResched(r => r && { ...r, duration: Number(e.target.value) })}
+                      style={{ width: '100%', padding: '9px 10px', border: '1px solid #E2E8F0', borderRadius: '10px', fontSize: '13px', outline: 'none', background: '#fff' }}>
+                      {[30, 40, 60, 90, 120].map(d => <option key={d} value={d}>{d} minutes</option>)}
+                    </select>
+                  </div>
+
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button onClick={() => setResched(null)} disabled={busy}
-                      style={{ flex: 1, padding: '9px', background: '#fff', color: '#475569', border: '1px solid #E2E8F0', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
+                      style={{ flex: 1, padding: '10px', background: '#fff', color: '#475569', border: '1px solid #E2E8F0', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
                       Back
                     </button>
                     <button onClick={saveReschedule} disabled={busy}
-                      style={{ flex: 1, padding: '9px', background: '#0D1B2A', color: '#E8C97A', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
-                      {busy ? 'Saving…' : 'Save New Time'}
+                      style={{ flex: 2, padding: '10px', background: '#0D1B2A', color: '#E8C97A', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
+                      {busy ? 'Saving…' : 'Save changes'}
                     </button>
                   </div>
                 </div>
@@ -530,7 +560,7 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
                 </button>
                 <button onClick={startReschedule} disabled={busy}
                   style={{ width: '100%', padding: '9px', background: '#E0E7FF', color: '#3730A3', border: 'none', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}>
-                  🕑 Reschedule
+                  ✏️ Edit session (teacher / time)
                 </button>
 
                 {selected.recurring_rule_id ? (

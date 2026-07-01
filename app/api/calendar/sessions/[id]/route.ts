@@ -49,34 +49,53 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json()
-  const { status, start_at, end_at, duration_minutes, notes, scope = 'one' } = body
+  const { status, start_at, end_at, duration_minutes, notes, teacher_id, teacher_scope = 'one', scope = 'one' } = body
 
   const { data: existing } = await supabase.from('calendar_sessions').select('*').eq('id', params.id).single()
   if (!existing) return NextResponse.json({ error: 'Session not found' }, { status: 404 })
 
-  const isReschedule = !!start_at && start_at !== existing.start_at
+  const isReschedule    = !!start_at && start_at !== existing.start_at
+  const isDurationChange = !!duration_minutes && duration_minutes !== existing.duration_minutes
+  const isTeacherChange = !!teacher_id && teacher_id !== existing.teacher_id
 
-  // Reschedule only ever affects the single occurrence
-  if (isReschedule) {
-    const update: Record<string, any> = {
-      status: 'scheduled', start_at, end_at, updated_by: user.id, updated_at: new Date().toISOString(),
-      reminder_24h_sent: false, reminder_12h_sent: false, reminder_1h_sent: false,
+  // Edit: change time/duration (this occurrence) and/or reassign the teacher
+  // (optionally across the whole future series). Time change stays single-occurrence.
+  if (status !== 'cancelled' && (isReschedule || isDurationChange || isTeacherChange)) {
+    const update: Record<string, any> = { updated_by: user.id, updated_at: new Date().toISOString() }
+    if (isReschedule) {
+      update.status = 'scheduled'; update.start_at = start_at; update.end_at = end_at
+      update.reminder_24h_sent = false; update.reminder_12h_sent = false; update.reminder_1h_sent = false
+    } else if (isDurationChange && end_at) {
+      update.end_at = end_at
     }
     if (duration_minutes) update.duration_minutes = duration_minutes
+    if (isTeacherChange)  update.teacher_id = teacher_id
     if (notes !== undefined) update.notes = notes
+
     const { data, error } = await supabase.from('calendar_sessions').update(update).eq('id', params.id).select().single()
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-    if (existing.google_event_id) {
+
+    // Reassign the teacher across all upcoming sessions in the series when asked
+    if (isTeacherChange && teacher_scope === 'future' && existing.recurring_rule_id) {
+      await supabase.from('calendar_sessions')
+        .update({ teacher_id, updated_by: user.id, updated_at: new Date().toISOString() })
+        .eq('recurring_rule_id', existing.recurring_rule_id)
+        .gte('start_at', existing.start_at)
+        .neq('id', params.id)
+    }
+
+    // Google time sync (this occurrence only)
+    if (isReschedule && existing.google_event_id) {
       try {
         if (existing.recurring_rule_id) {
-          // Move just this occurrence of the series, not the whole series
           await rescheduleRecurringInstance(existing.google_event_id, existing.start_at, start_at, end_at, 'Africa/Cairo')
         } else {
           await updateCalendarEventTime(existing.google_event_id, start_at, end_at, 'Africa/Cairo')
         }
       } catch (e: any) { console.error('[Calendar] Google reschedule failed:', e?.message) }
     }
-    await supabase.from('calendar_audit_log').insert({ event_id: params.id, action: 'rescheduled', performed_by: user.id, old_data: existing, new_data: data, source: 'crm' })
+
+    await supabase.from('calendar_audit_log').insert({ event_id: params.id, action: 'edited', performed_by: user.id, old_data: existing, new_data: data, source: 'crm' })
     return NextResponse.json(data)
   }
 
