@@ -137,11 +137,16 @@ export default function TeacherNewSessionPage() {
             <div><label style={lbl}>Feedback / Progress Notes</label><textarea style={{ ...inp, minHeight: '80px', resize: 'vertical' }} value={form.feedback} onChange={e => setForm(f => ({...f, feedback: e.target.value}))} placeholder="What was covered, student progress..." /></div>
           </div>
         </div>
-        {form.session_type === 'paid' && form.attendance_status === 'attended' && (
-          <div style={{ background: '#ECFDF5', border: '1px solid #6EE7B7', borderRadius: '10px', padding: '12px 16px', marginBottom: '16px', fontSize: '13px', color: '#065F46' }}>
-            ⚡ This will automatically deduct 1 class from the student's balance.
-          </div>
-        )}
+        {form.session_type === 'paid' && form.attendance_status === 'attended' && selectedStudent && (() => {
+          const base = selectedStudent.session_duration || Number(form.duration) || 60
+          const units = Math.max(1, Math.round(Number(form.duration) / base))
+          return (
+            <div style={{ background: '#ECFDF5', border: '1px solid #6EE7B7', borderRadius: '10px', padding: '12px 16px', marginBottom: '16px', fontSize: '13px', color: '#065F46' }}>
+              ⚡ This will deduct <strong>{units} class{units !== 1 ? 'es' : ''}</strong> from the student&apos;s balance
+              {units !== 1 && <> ({form.duration}min session ÷ {base}min base)</>}.
+            </div>
+          )
+        })()}
         {error && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626', padding: '12px 16px', borderRadius: '8px', fontSize: '14px', marginBottom: '16px' }}>{error}</div>}
         <div style={{ display: 'flex', gap: '12px' }}>
           <button type="submit" disabled={loading} style={{ background: '#0D1B2A', color: '#E8C97A', padding: '12px 28px', borderRadius: '10px', border: 'none', fontWeight: '600', fontSize: '14px', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}>

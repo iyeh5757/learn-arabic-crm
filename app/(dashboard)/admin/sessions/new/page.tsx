@@ -153,11 +153,16 @@ export default function NewSessionPage() {
           </div>
         </div>
 
-        {form.session_type === 'paid' && form.attendance_status === 'attended' && (
-          <div style={{ background: '#ECFDF5', border: '1px solid #6EE7B7', borderRadius: '10px', padding: '12px 16px', marginBottom: '16px', fontSize: '13px', color: '#065F46' }}>
-            ⚡ Marking this as <strong>Paid + Attended</strong> will automatically deduct 1 class from the student's remaining balance.
-          </div>
-        )}
+        {form.session_type === 'paid' && form.attendance_status === 'attended' && selectedStudent && (() => {
+          const base = selectedStudent.session_duration || Number(form.duration) || 60
+          const units = Math.max(1, Math.round(Number(form.duration) / base))
+          return (
+            <div style={{ background: '#ECFDF5', border: '1px solid #6EE7B7', borderRadius: '10px', padding: '12px 16px', marginBottom: '16px', fontSize: '13px', color: '#065F46' }}>
+              ⚡ Marking this as <strong>Paid + Attended</strong> will deduct <strong>{units} class{units !== 1 ? 'es' : ''}</strong> from the student&apos;s balance
+              {units !== 1 && <> ({form.duration}min ÷ {base}min base)</>}.
+            </div>
+          )
+        })()}
 
         {error && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626', padding: '12px 16px', borderRadius: '8px', fontSize: '14px', marginBottom: '16px' }}>{error}</div>}
 
