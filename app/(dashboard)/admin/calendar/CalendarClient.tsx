@@ -79,7 +79,7 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
   const [studentQuery, setStudentQuery] = useState('')
   const [showStudentList, setShowStudentList] = useState(false)
   const [loadError, setLoadError] = useState('')
-  const [resched, setResched] = useState<null | { date: string; time: string; duration: number; teacher_id: string; teacherFuture: boolean }>(null)
+  const [resched, setResched] = useState<null | { date: string; time: string; duration: number; teacher_id: string; scope: 'one' | 'future' | 'all' }>(null)
   const filterTeacherRef    = useRef('')
   const filterSupervisorRef = useRef('')
   const mineRef             = useRef(false)
@@ -277,7 +277,7 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
       time: `${m.hour === '24' ? '00' : m.hour}:${m.minute}`,
       duration: selected.duration_minutes,
       teacher_id: selected.teacher?.id ?? '',
-      teacherFuture: false,
+      scope: 'one',
     })
   }
 
@@ -292,8 +292,9 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
         start_at: start.toISOString(),
         end_at:   end.toISOString(),
         duration_minutes: resched.duration,
+        time:       resched.time,                 // Cairo HH:mm — used to retime the series
         teacher_id: resched.teacher_id || undefined,
-        teacher_scope: resched.teacherFuture ? 'future' : 'one',
+        edit_scope: selected.recurring_rule_id ? resched.scope : 'one',
       }),
     })
     setBusy(false)
@@ -508,12 +509,6 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
                       style={{ width: '100%', padding: '9px 10px', border: '1px solid #E2E8F0', borderRadius: '10px', fontSize: '13px', outline: 'none', background: '#fff' }}>
                       {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                     </select>
-                    {selected.recurring_rule_id && resched.teacher_id !== (selected.teacher?.id ?? '') && (
-                      <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px', fontSize: '12px', color: '#334155', cursor: 'pointer' }}>
-                        <input type="checkbox" checked={resched.teacherFuture} onChange={e => setResched(r => r && { ...r, teacherFuture: e.target.checked })} />
-                        Apply this teacher to all upcoming sessions in the series
-                      </label>
-                    )}
                   </div>
 
                   <div style={{ marginBottom: '12px' }}>
@@ -524,9 +519,6 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
                       <input type="time" value={resched.time} onChange={e => setResched(r => r && { ...r, time: e.target.value })}
                         style={{ padding: '9px 10px', border: '1px solid #E2E8F0', borderRadius: '10px', fontSize: '13px', outline: 'none' }} />
                     </div>
-                    {selected.recurring_rule_id && (
-                      <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '5px' }}>Time change applies to this session only.</div>
-                    )}
                   </div>
 
                   <div style={{ marginBottom: '14px' }}>
@@ -536,6 +528,29 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
                       {[30, 40, 60, 90, 120].map(d => <option key={d} value={d}>{d} minutes</option>)}
                     </select>
                   </div>
+
+                  {/* Apply-to scope for recurring series */}
+                  {selected.recurring_rule_id && (
+                    <div style={{ marginBottom: '14px' }}>
+                      <label style={{ ...label, marginBottom: '6px' }}>🔁 Apply changes to</label>
+                      <div style={{ display: 'flex', gap: '6px' }}>
+                        {([['one', 'This session'], ['future', 'This & future'], ['all', 'All upcoming']] as const).map(([val, txt]) => (
+                          <button key={val} type="button" onClick={() => setResched(r => r && { ...r, scope: val })}
+                            style={{ flex: 1, padding: '8px 6px', borderRadius: '9px', fontSize: '11px', fontWeight: '700', cursor: 'pointer',
+                              border: resched.scope === val ? '1.5px solid #0D1B2A' : '1px solid #E2E8F0',
+                              background: resched.scope === val ? '#0D1B2A' : '#fff',
+                              color: resched.scope === val ? '#E8C97A' : '#475569' }}>
+                            {txt}
+                          </button>
+                        ))}
+                      </div>
+                      {resched.scope !== 'one' && (
+                        <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '6px' }}>
+                          The new time ({resched.time}) &amp; teacher apply to {resched.scope === 'future' ? 'this and every later' : 'every upcoming'} session — each keeps its own date. Changing the calendar date only affects this session.
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                   <div style={{ display: 'flex', gap: '8px' }}>
                     <button onClick={() => setResched(null)} disabled={busy}
