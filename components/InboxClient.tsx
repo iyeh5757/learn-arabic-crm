@@ -236,17 +236,36 @@ export default function InboxClient({ currentUserId, reps, countries, rolePrefix
             )}
 
             <div ref={threadRef} style={{ flex: 1, overflowY: 'auto', padding: '16px', background: '#F8FAFC', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {msgs.map(m => (
+              {msgs.map(m => {
+                const mediaSrc = m.media_type ? `/api/whatsapp/media/${m.id}` : null
+                return (
                 <div key={m.id} style={{ alignSelf: m.direction === 'out' ? 'flex-end' : 'flex-start', maxWidth: '72%' }}>
                   <div style={{ background: m.direction === 'out' ? '#0D1B2A' : '#fff', color: m.direction === 'out' ? '#fff' : '#0F172A',
                     border: m.direction === 'out' ? 'none' : '1px solid #E5E7EB', borderRadius: '12px', padding: '9px 12px', fontSize: '13px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                    {m.body}
+                    {mediaSrc && m.media_type === 'image' && (
+                      <a href={mediaSrc} target="_blank" rel="noreferrer">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={mediaSrc} alt="photo" style={{ maxWidth: '240px', maxHeight: '280px', borderRadius: '8px', display: 'block' }} />
+                      </a>
+                    )}
+                    {mediaSrc && m.media_type === 'audio' && (
+                      <audio controls src={mediaSrc} style={{ maxWidth: '240px' }} />
+                    )}
+                    {mediaSrc && m.media_type === 'video' && (
+                      <video controls src={mediaSrc} style={{ maxWidth: '260px', borderRadius: '8px' }} />
+                    )}
+                    {mediaSrc && m.media_type === 'document' && (
+                      <a href={mediaSrc} target="_blank" rel="noreferrer" style={{ color: m.direction === 'out' ? '#E8C97A' : '#2563EB', fontWeight: 600 }}>📎 {m.body || 'Document'}</a>
+                    )}
+                    {(!m.media_type || m.media_type === 'document') ? (m.media_type === 'document' ? null : m.body)
+                      : <div style={{ marginTop: m.body ? '5px' : 0, fontSize: '12px' }}>{m.body && m.body !== '📷 Photo' && m.body !== '🎤 Voice message' && m.body !== '🎥 Video' ? m.body : ''}</div>}
                   </div>
                   <div style={{ fontSize: '10px', color: '#94A3B8', marginTop: '2px', textAlign: m.direction === 'out' ? 'right' : 'left' }}>
                     {m.direction === 'out' && m.sender_name ? `${m.sender_name} · ` : ''}{fmtTime(m.created_at)}
                   </div>
                 </div>
-              ))}
+                )
+              })}
             </div>
 
             {/* Quick replies */}

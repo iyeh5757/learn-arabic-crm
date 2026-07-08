@@ -163,6 +163,35 @@ export async function sendWhatsAppReminder(
   }
 }
 
+// Download a media message's bytes from Evolution (base64). `raw` is the raw
+// message payload we captured from the webhook. Returns the decoded buffer +
+// mimetype, or null on failure. Tries a couple of request shapes across versions.
+export async function getMediaBase64FromEvolution(
+  raw: any
+): Promise<{ buffer: Buffer; mimetype: string } | null> {
+  if (!API_URL || !API_KEY || !INSTANCE || !raw) return null
+  const bodies = [
+    { message: raw, convertToMp4: false },
+    { message: { key: raw.key }, convertToMp4: false },
+  ]
+  for (const body of bodies) {
+    try {
+      const res = await fetch(`${API_URL}/chat/getBase64FromMediaMessage/${INSTANCE}`, {
+        method: 'POST', headers: { apikey: API_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) continue
+      const j = await res.json().catch(() => null)
+      const b64 = j?.base64 ?? j?.media ?? j?.buffer
+      if (typeof b64 === 'string' && b64.length > 0) {
+        const mimetype = j?.mimetype ?? j?.mimeType ?? 'application/octet-stream'
+        return { buffer: Buffer.from(b64, 'base64'), mimetype }
+      }
+    } catch { /* try next shape */ }
+  }
+  return null
+}
+
 // Generic free-text send — used by the shared team inbox. `to` may be a full
 // WhatsApp JID (…@s.whatsapp.net / …@g.us) or a plain phone number.
 export async function sendWhatsAppText(

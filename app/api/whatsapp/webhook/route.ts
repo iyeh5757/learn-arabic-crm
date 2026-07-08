@@ -100,12 +100,14 @@ export async function POST(req: Request) {
 
     if (!conversationId) continue
 
-    // Insert the message (dedupe by WhatsApp message id)
+    // Insert the message (dedupe by WhatsApp message id). Keep the raw payload
+    // for media so we can fetch the file from Evolution on demand.
     await supabase.from('wa_messages').insert({
       conversation_id: conversationId,
       wa_message_id: waMessageId,
       direction, body, media_type: mediaType,
       sender_name: fromMe ? 'You' : (pushName ?? null),
+      raw: mediaType ? data : null,
       created_at: ts,
     }).then(() => {}, () => {})   // ignore unique-violation duplicates
   }
