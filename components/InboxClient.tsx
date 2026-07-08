@@ -65,9 +65,28 @@ export default function InboxClient({ currentUserId, reps, countries, rolePrefix
       .then(({ data }) => setStudent(data as StudentCtx ?? null))
   }, [selected?.student_id])
 
-  // Poll for updates
+  // Keep the latest loaders/selection in refs so the realtime subscription
+  // (mounted once) always calls the current versions.
+  const loadConvsRef = useRef(loadConvs); loadConvsRef.current = loadConvs
+  const loadMsgsRef = useRef(loadMsgs); loadMsgsRef.current = loadMsgs
+  const selIdRef = useRef(selectedId); selIdRef.current = selectedId
+
+  // Real-time: refresh instantly when messages/conversations change (RLS-scoped)
   useEffect(() => {
-    const t = setInterval(() => { loadConvs(); if (selectedId) loadMsgs(selectedId) }, 5000)
+    const ch = supabase.channel('wa-inbox')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'wa_messages' }, () => {
+        loadConvsRef.current(); const s = selIdRef.current; if (s) loadMsgsRef.current(s)
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'wa_conversations' }, () => {
+        loadConvsRef.current()
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(ch) }
+  }, [])
+
+  // Safety-net poll in case a realtime event is missed
+  useEffect(() => {
+    const t = setInterval(() => { loadConvs(); if (selectedId) loadMsgs(selectedId) }, 20000)
     return () => clearInterval(t)
   }, [loadConvs, loadMsgs, selectedId])
 
