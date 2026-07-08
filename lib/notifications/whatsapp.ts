@@ -162,3 +162,32 @@ export async function sendWhatsAppReminder(
     return { success: false, error: err?.message ?? 'Network error' }
   }
 }
+
+// Generic free-text send — used by the shared team inbox. `to` may be a full
+// WhatsApp JID (…@s.whatsapp.net / …@g.us) or a plain phone number.
+export async function sendWhatsAppText(
+  to: string, text: string
+): Promise<{ success: boolean; id?: string; error?: string }> {
+  if (!API_URL || !API_KEY || !INSTANCE) {
+    return { success: false, error: 'Evolution API credentials not configured' }
+  }
+  const number = to.includes('@') ? to.split('@')[0] : normalisePhone(to)
+  if (!number) return { success: false, error: 'No recipient' }
+
+  try {
+    const res = await fetch(`${API_URL}/message/sendText/${INSTANCE}`, {
+      method:  'POST',
+      headers: { apikey: API_KEY, 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ number, text }),
+    })
+    let json: any = null
+    try { json = await res.json() } catch { /* non-JSON */ }
+    if (!res.ok) {
+      const errMsg = json?.message ?? json?.error ?? `HTTP ${res.status}`
+      return { success: false, error: typeof errMsg === 'string' ? errMsg : JSON.stringify(errMsg) }
+    }
+    return { success: true, id: json?.key?.id ?? undefined }
+  } catch (err: any) {
+    return { success: false, error: err?.message ?? 'Network error' }
+  }
+}
