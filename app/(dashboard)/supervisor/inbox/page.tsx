@@ -22,7 +22,7 @@ export default async function SupervisorInboxPage() {
         <h1 style={{ fontSize: '22px', fontWeight: 800, color: '#111827', margin: 0 }}>💬 Team Inbox</h1>
         <p style={{ fontSize: '13px', color: '#6B7280', margin: '4px 0 0' }}>Reply to customers on the business WhatsApp — assign, filter by country, track status.</p>
       </div>
-      <InboxClient currentUserId={user.id} reps={reps} countries={countries} />
+      <InboxClient currentUserId={user.id} reps={reps} countries={countries} rolePrefix="/supervisor" />
     </div>
   )
 }

@@ -14,8 +14,16 @@ type Conv = {
 }
 type Msg = { id: string; direction: string; body: string | null; media_type: string | null; sender_name: string | null; created_at: string }
 type Rep = { id: string; name: string }
+type StudentCtx = { id: string; name: string; student_status: string | null; total_paid_classes: number | null; consumed_classes: number | null; recontact_date: string | null }
 
-export default function InboxClient({ currentUserId, reps, countries }: { currentUserId: string; reps: Rep[]; countries: string[] }) {
+const QUICK_REPLIES = [
+  { label: '👋 Greeting', text: 'Hello! Thank you for reaching out to Learn Arabic Academy 😊 How can we help you today?' },
+  { label: '💷 Pricing', text: 'Here are our packages — could you tell me how many sessions per week you have in mind, and your preferred session length (30 / 60 min)?' },
+  { label: '🗓 Booking', text: 'Great! What days and times usually work best for you? We\'ll match you with a teacher and send a Google Meet link.' },
+  { label: '🔁 Follow-up', text: 'Just following up on your Arabic classes — would you like to continue? We\'d love to have you back 😊' },
+]
+
+export default function InboxClient({ currentUserId, reps, countries, rolePrefix }: { currentUserId: string; reps: Rep[]; countries: string[]; rolePrefix: string }) {
   const supabase = createClient()
   const [convs, setConvs] = useState<Conv[]>([])
   const [selected, setSelected] = useState<Conv | null>(null)
@@ -26,6 +34,8 @@ export default function InboxClient({ currentUserId, reps, countries }: { curren
   const [fCountry, setFCountry] = useState('')
   const [fStatus, setFStatus] = useState('open')
   const [fAssignee, setFAssignee] = useState('')       // '', 'me', 'unassigned'
+  const [student, setStudent] = useState<StudentCtx | null>(null)
+  const [savingCtx, setSavingCtx] = useState(false)
   const threadRef = useRef<HTMLDivElement>(null)
   const selectedId = selected?.id
 
@@ -46,6 +56,14 @@ export default function InboxClient({ currentUserId, reps, countries }: { curren
 
   useEffect(() => { loadConvs() }, [loadConvs])
   useEffect(() => { if (selectedId) loadMsgs(selectedId) }, [selectedId, loadMsgs])
+
+  // Load the linked customer's CRM context when a conversation is opened
+  useEffect(() => {
+    const sid = selected?.student_id
+    if (!sid) { setStudent(null); return }
+    supabase.from('students').select('id, name, student_status, total_paid_classes, consumed_classes, recontact_date').eq('id', sid).single()
+      .then(({ data }) => setStudent(data as StudentCtx ?? null))
+  }, [selected?.student_id])
 
   // Poll for updates
   useEffect(() => {
@@ -85,6 +103,15 @@ export default function InboxClient({ currentUserId, reps, countries }: { curren
     await supabase.from('wa_conversations').update({ status }).eq('id', convId)
     setConvs(prev => prev.filter(x => fStatus ? x.status === fStatus || x.id !== convId : true).map(x => x.id === convId ? { ...x, status } : x))
     if (selected?.id === convId) setSelected(s => s && { ...s, status })
+  }
+
+  async function saveStudent(patch: Partial<StudentCtx>) {
+    if (!student) return
+    setSavingCtx(true)
+    const { error } = await supabase.from('students').update(patch).eq('id', student.id)
+    setSavingCtx(false)
+    if (error) { alert(`Couldn't update customer: ${error.message}`); return }
+    setStudent(s => s && { ...s, ...patch })
   }
 
   const filtered = convs.filter(c => !search || (c.name ?? '').toLowerCase().includes(search.toLowerCase()) || (c.phone ?? '').includes(search))
@@ -163,6 +190,32 @@ export default function InboxClient({ currentUserId, reps, countries }: { curren
               </div>
             </div>
 
+            {/* Customer CRM context */}
+            {student ? (
+              <div style={{ padding: '10px 16px', borderBottom: '1px solid #F1F5F9', background: '#FCFCFD', display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                <a href={`${rolePrefix}/students/${student.id}/edit`} style={{ fontSize: '12px', fontWeight: 700, color: '#0D1B2A', textDecoration: 'none' }}>
+                  👤 {student.name} ↗
+                </a>
+                <span style={{ fontSize: '11px', color: '#475569' }}>
+                  {Math.max(0, (student.total_paid_classes ?? 0) - (student.consumed_classes ?? 0))} classes left
+                </span>
+                <label style={{ fontSize: '11px', color: '#64748B', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  Status
+                  <select value={student.student_status ?? ''} onChange={e => saveStudent({ student_status: e.target.value })} disabled={savingCtx} style={{ ...sel, padding: '4px 6px' }}>
+                    <option value="trial">Trial</option><option value="active">Active</option><option value="inactive">Inactive</option>
+                  </select>
+                </label>
+                <label style={{ fontSize: '11px', color: '#64748B', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  Follow-up
+                  <input type="date" value={student.recontact_date ?? ''} onChange={e => saveStudent({ recontact_date: e.target.value || null })} disabled={savingCtx} style={{ ...sel, padding: '4px 6px' }} />
+                </label>
+              </div>
+            ) : !selected.is_group && (
+              <div style={{ padding: '8px 16px', borderBottom: '1px solid #F1F5F9', background: '#FFFBEB', fontSize: '11px', color: '#92400E' }}>
+                ⚠️ Not linked to a saved customer — add them in Students (phone {selected.phone}) to track status & follow-ups.
+              </div>
+            )}
+
             <div ref={threadRef} style={{ flex: 1, overflowY: 'auto', padding: '16px', background: '#F8FAFC', display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {msgs.map(m => (
                 <div key={m.id} style={{ alignSelf: m.direction === 'out' ? 'flex-end' : 'flex-start', maxWidth: '72%' }}>
@@ -174,6 +227,17 @@ export default function InboxClient({ currentUserId, reps, countries }: { curren
                     {m.direction === 'out' && m.sender_name ? `${m.sender_name} · ` : ''}{fmtTime(m.created_at)}
                   </div>
                 </div>
+              ))}
+            </div>
+
+            {/* Quick replies */}
+            <div style={{ padding: '8px 12px 0', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+              {QUICK_REPLIES.map(q => (
+                <button key={q.label} type="button" onClick={() => setReply(r => r ? r : q.text)}
+                  title={q.text}
+                  style={{ fontSize: '11px', color: '#334155', background: '#F1F5F9', border: '1px solid #E2E8F0', borderRadius: '20px', padding: '4px 10px', cursor: 'pointer' }}>
+                  {q.label}
+                </button>
               ))}
             </div>
 

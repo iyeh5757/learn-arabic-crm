@@ -9,6 +9,11 @@ export const runtime = 'nodejs'
 
 const WEBHOOK_TOKEN = (process.env.WHATSAPP_WEBHOOK_TOKEN ?? '').trim()
 
+// Health check — Evolution (and you) can GET this to confirm the URL is reachable.
+export async function GET() {
+  return NextResponse.json({ ok: true, service: 'whatsapp-webhook' })
+}
+
 // Pull the readable text (or a media placeholder) out of an Evolution message.
 function extractContent(message: any): { body: string; mediaType: string | null } {
   if (!message) return { body: '', mediaType: null }
