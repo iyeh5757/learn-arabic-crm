@@ -15,13 +15,7 @@ type Conv = {
 type Msg = { id: string; direction: string; body: string | null; media_type: string | null; sender_name: string | null; created_at: string }
 type Rep = { id: string; name: string }
 type StudentCtx = { id: string; name: string; student_status: string | null; total_paid_classes: number | null; consumed_classes: number | null; recontact_date: string | null }
-
-const QUICK_REPLIES = [
-  { label: '👋 Greeting', text: 'Hello! Thank you for reaching out to Learn Arabic Academy 😊 How can we help you today?' },
-  { label: '💷 Pricing', text: 'Here are our packages — could you tell me how many sessions per week you have in mind, and your preferred session length (30 / 60 min)?' },
-  { label: '🗓 Booking', text: 'Great! What days and times usually work best for you? We\'ll match you with a teacher and send a Google Meet link.' },
-  { label: '🔁 Follow-up', text: 'Just following up on your Arabic classes — would you like to continue? We\'d love to have you back 😊' },
-]
+type QuickReply = { id: string; label: string; text: string }
 
 export default function InboxClient({ currentUserId, reps, countries, rolePrefix }: { currentUserId: string; reps: Rep[]; countries: string[]; rolePrefix: string }) {
   const supabase = createClient()
@@ -36,6 +30,9 @@ export default function InboxClient({ currentUserId, reps, countries, rolePrefix
   const [fAssignee, setFAssignee] = useState('')       // '', 'me', 'unassigned'
   const [student, setStudent] = useState<StudentCtx | null>(null)
   const [savingCtx, setSavingCtx] = useState(false)
+  const [quickReplies, setQuickReplies] = useState<QuickReply[]>([])
+  const [manageQR, setManageQR] = useState(false)
+  const [qrLabel, setQrLabel] = useState(''); const [qrText, setQrText] = useState('')
   const threadRef = useRef<HTMLDivElement>(null)
   const selectedId = selected?.id
 
@@ -54,7 +51,13 @@ export default function InboxClient({ currentUserId, reps, countries, rolePrefix
     setMsgs(data ?? [])
   }, [])
 
+  const loadQuickReplies = useCallback(async () => {
+    const { data } = await supabase.from('wa_quick_replies').select('id, label, text').order('created_at')
+    setQuickReplies(data ?? [])
+  }, [])
+
   useEffect(() => { loadConvs() }, [loadConvs])
+  useEffect(() => { loadQuickReplies() }, [loadQuickReplies])
   useEffect(() => { if (selectedId) loadMsgs(selectedId) }, [selectedId, loadMsgs])
 
   // Load the linked customer's CRM context when a conversation is opened
@@ -131,6 +134,17 @@ export default function InboxClient({ currentUserId, reps, countries, rolePrefix
     setSavingCtx(false)
     if (error) { alert(`Couldn't update customer: ${error.message}`); return }
     setStudent(s => s && { ...s, ...patch })
+  }
+
+  async function addQuickReply() {
+    if (!qrLabel.trim() || !qrText.trim()) return
+    const { error } = await supabase.from('wa_quick_replies').insert({ label: qrLabel.trim(), text: qrText.trim(), created_by: currentUserId })
+    if (error) { alert(`Couldn't save: ${error.message}`); return }
+    setQrLabel(''); setQrText(''); loadQuickReplies()
+  }
+  async function deleteQuickReply(id: string) {
+    await supabase.from('wa_quick_replies').delete().eq('id', id)
+    loadQuickReplies()
   }
 
   const filtered = convs.filter(c => !search || (c.name ?? '').toLowerCase().includes(search.toLowerCase()) || (c.phone ?? '').includes(search))
@@ -269,14 +283,18 @@ export default function InboxClient({ currentUserId, reps, countries, rolePrefix
             </div>
 
             {/* Quick replies */}
-            <div style={{ padding: '8px 12px 0', display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-              {QUICK_REPLIES.map(q => (
-                <button key={q.label} type="button" onClick={() => setReply(r => r ? r : q.text)}
+            <div style={{ padding: '8px 12px 0', display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+              {quickReplies.map(q => (
+                <button key={q.id} type="button" onClick={() => setReply(r => (r ? r + '\n' : '') + q.text)}
                   title={q.text}
                   style={{ fontSize: '11px', color: '#334155', background: '#F1F5F9', border: '1px solid #E2E8F0', borderRadius: '20px', padding: '4px 10px', cursor: 'pointer' }}>
                   {q.label}
                 </button>
               ))}
+              <button type="button" onClick={() => setManageQR(true)} title="Manage quick replies"
+                style={{ fontSize: '11px', color: '#065F46', background: '#F0FDF4', border: '1px dashed #86EFAC', borderRadius: '20px', padding: '4px 10px', cursor: 'pointer', fontWeight: 700 }}>
+                ＋ Quick reply
+              </button>
             </div>
 
             <div style={{ padding: '12px', borderTop: '1px solid #F1F5F9', display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
@@ -291,6 +309,43 @@ export default function InboxClient({ currentUserId, reps, countries, rolePrefix
           </>
         )}
       </div>
+
+      {/* Manage quick replies */}
+      {manageQR && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
+          onClick={() => setManageQR(false)}>
+          <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '460px', maxHeight: '85vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding: '16px 20px', borderBottom: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ fontWeight: 800, fontSize: '15px' }}>⚡ Quick replies</div>
+              <button onClick={() => setManageQR(false)} style={{ background: '#F1F5F9', border: 'none', borderRadius: '8px', width: '28px', height: '28px', cursor: 'pointer', color: '#64748B' }}>✕</button>
+            </div>
+            <div style={{ overflowY: 'auto', padding: '14px 20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {quickReplies.map(q => (
+                <div key={q.id} style={{ display: 'flex', gap: '8px', alignItems: 'flex-start', border: '1px solid #F1F5F9', borderRadius: '10px', padding: '9px 11px' }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700, fontSize: '12px', color: '#0F172A' }}>{q.label}</div>
+                    <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px', whiteSpace: 'pre-wrap' }}>{q.text}</div>
+                  </div>
+                  <button onClick={() => deleteQuickReply(q.id)} title="Delete"
+                    style={{ background: '#FEF2F2', color: '#DC2626', border: 'none', borderRadius: '7px', padding: '4px 9px', fontSize: '12px', cursor: 'pointer', fontWeight: 700 }}>✕</button>
+                </div>
+              ))}
+              {quickReplies.length === 0 && <div style={{ fontSize: '12px', color: '#9CA3AF', textAlign: 'center', padding: '12px' }}>No quick replies yet — add one below.</div>}
+            </div>
+            <div style={{ padding: '14px 20px', borderTop: '1px solid #F1F5F9', background: '#FCFCFD' }}>
+              <div style={{ fontSize: '11px', fontWeight: 700, color: '#64748B', marginBottom: '6px' }}>ADD NEW</div>
+              <input value={qrLabel} onChange={e => setQrLabel(e.target.value)} placeholder="Label (e.g. 💷 Pricing)"
+                style={{ width: '100%', padding: '8px 11px', border: '1px solid #E2E8F0', borderRadius: '9px', fontSize: '13px', outline: 'none', boxSizing: 'border-box', marginBottom: '8px' }} />
+              <textarea value={qrText} onChange={e => setQrText(e.target.value)} placeholder="Message text…" rows={3}
+                style={{ width: '100%', padding: '8px 11px', border: '1px solid #E2E8F0', borderRadius: '9px', fontSize: '13px', outline: 'none', boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }} />
+              <button onClick={addQuickReply} disabled={!qrLabel.trim() || !qrText.trim()}
+                style={{ marginTop: '8px', background: '#0D1B2A', color: '#E8C97A', border: 'none', borderRadius: '9px', padding: '9px 16px', fontSize: '13px', fontWeight: 700, cursor: 'pointer', opacity: (!qrLabel.trim() || !qrText.trim()) ? 0.6 : 1 }}>
+                Add quick reply
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
