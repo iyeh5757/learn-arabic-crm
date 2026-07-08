@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import InboxClient from '@/components/InboxClient'
+import ConnectInboxButton from '@/components/ConnectInboxButton'
 
 export default async function AdminInboxPage() {
   const supabase = createClient()
@@ -20,7 +21,8 @@ export default async function AdminInboxPage() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
       <div>
         <h1 style={{ fontSize: '22px', fontWeight: 800, color: '#111827', margin: 0 }}>💬 Team Inbox</h1>
-        <p style={{ fontSize: '13px', color: '#6B7280', margin: '4px 0 0' }}>Reply to customers on the business WhatsApp — assign, filter by country, track status.</p>
+        <p style={{ fontSize: '13px', color: '#6B7280', margin: '4px 0 0 0' }}>Reply to customers on the business WhatsApp — assign, filter by country, track status.</p>
+        <div style={{ marginTop: '10px' }}><ConnectInboxButton /></div>
       </div>
       <InboxClient currentUserId={user.id} reps={reps} countries={countries} rolePrefix="/admin" />
     </div>
