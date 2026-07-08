@@ -28,8 +28,10 @@ export default function CreateGroupButton({
     })
     const data = await res.json()
     setBusy(false)
-    if (res.ok && data.jid) { onCreated(data.jid); setOpen(false); alert('✅ Group created and linked. Reminders for this student will go to the group.') }
-    else alert(`Couldn't create group: ${data?.error ?? 'unknown error'}`)
+    if (res.ok && data.jid) {
+      onCreated(data.jid); setOpen(false)
+      alert(`✅ Group created and linked — reminders for this student will go here.${data.inviteUrl ? '\n\nAn invite link was sent to the participants so anyone whose privacy blocks direct adds can join with one tap.' : ''}`)
+    } else alert(`Couldn't create group: ${data?.error ?? 'unknown error'}`)
   }
 
   if (!open) {

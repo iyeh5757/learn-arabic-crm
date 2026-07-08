@@ -2,6 +2,8 @@
 // Create a WhatsApp group via Evolution (the business number becomes admin).
 // Optionally link the new group to a student so reminders go there.
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { sendWhatsAppText } from '@/lib/notifications/whatsapp'
 import { NextResponse } from 'next/server'
 
 export const runtime = 'nodejs'
@@ -49,10 +51,42 @@ export async function POST(req: Request) {
     const jid: string | undefined = j?.id ?? j?.groupJid ?? j?.gid ?? j?.key?.remoteJid ?? j?.group?.id
     if (!jid) return NextResponse.json({ error: 'Group created but no group ID returned', raw: j }, { status: 200 })
 
+    const admin = createAdminClient()
+
+    // 1) Create the conversation row now so the group shows in the inbox
+    //    immediately (before any message flows through the webhook).
+    await admin.from('wa_conversations').upsert({
+      wa_jid: jid, is_group: true, name: subject.trim(),
+      last_message_at: new Date().toISOString(), last_message_preview: 'Group created', last_direction: 'out',
+      status: 'open', unread_count: 0,
+    }, { onConflict: 'wa_jid' })
+
     if (student_id) {
       await supabase.from('students').update({ whatsapp_group_id: jid }).eq('id', student_id)
     }
-    return NextResponse.json({ ok: true, jid })
+
+    // 2) Some numbers can't be added directly (their "who can add me to groups"
+    //    privacy blocks it). Fetch the invite link and DM it to every participant
+    //    so they can join with one tap regardless of privacy settings.
+    let inviteUrl = ''
+    try {
+      const invRes = await fetch(`${API_URL}/group/inviteCode/${INSTANCE}?groupJid=${encodeURIComponent(jid)}`, { headers: { apikey: API_KEY } })
+      const invJ = await invRes.json().catch(() => null)
+      const code = invJ?.inviteCode ?? invJ?.code ?? invJ?.inviteCode
+      inviteUrl = invJ?.inviteUrl ?? (code ? `https://chat.whatsapp.com/${code}` : '')
+    } catch { /* best-effort */ }
+
+    let invited = 0
+    if (inviteUrl) {
+      for (const n of nums) {
+        try {
+          const r = await sendWhatsAppText(n, `You've been added to *${subject.trim()}* 🎓\nIf you can't see the group yet, tap here to join:\n${inviteUrl}`)
+          if (r.success) invited++
+        } catch { /* skip */ }
+      }
+    }
+
+    return NextResponse.json({ ok: true, jid, inviteUrl: inviteUrl || null, invited })
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? 'Network error' }, { status: 500 })
   }

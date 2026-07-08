@@ -159,8 +159,10 @@ export default function InboxClient({ currentUserId, reps, countries, rolePrefix
     })
     const data = await res.json()
     setNgBusy(false)
-    if (res.ok && data.jid) { setNewGroup(false); setNgName(''); setNgNumbers(''); loadConvs(); alert('✅ Group created.') }
-    else alert(`Couldn't create group: ${data?.error ?? 'unknown error'}`)
+    if (res.ok && data.jid) {
+      setNewGroup(false); setNgName(''); setNgNumbers(''); loadConvs()
+      alert(`✅ Group created — it now shows in your conversation list.${data.inviteUrl ? '\n\nAn invite link was sent to the participants so anyone whose privacy blocks direct adds can join.' : ''}`)
+    } else alert(`Couldn't create group: ${data?.error ?? 'unknown error'}`)
   }
 
   const filtered = convs.filter(c => !search || (c.name ?? '').toLowerCase().includes(search.toLowerCase()) || (c.phone ?? '').includes(search))
