@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter, useParams } from 'next/navigation'
 
 import { COUNTRIES, COUNTRY_CURRENCY } from '@/lib/countries'
+import CreateGroupButton from '@/components/CreateGroupButton'
 
 export default function SupervisorEditStudentPage() {
   const router = useRouter()
@@ -244,6 +245,8 @@ export default function SupervisorEditStudentPage() {
                 placeholder="e.g. 120363XXXXXXXXXX@g.us"
                 value={form.whatsapp_group_id ?? ''}
                 onChange={e => setForm((f: any) => ({ ...f, whatsapp_group_id: e.target.value }))} />
+              <CreateGroupButton studentId={id} studentName={form.name ?? ''} studentPhone={form.phone ?? null}
+                onCreated={jid => setForm((f: any) => ({ ...f, whatsapp_group_id: jid }))} />
               {form.whatsapp_group_id && (
                 <button type="button" onClick={() => setForm((f: any) => ({ ...f, whatsapp_group_id: '' }))}
                   style={{ whiteSpace: 'nowrap', background: '#FEF2F2', color: '#DC2626', padding: '9px 14px', borderRadius: '8px', border: '1px solid #FECACA', fontSize: '13px', cursor: 'pointer' }}>

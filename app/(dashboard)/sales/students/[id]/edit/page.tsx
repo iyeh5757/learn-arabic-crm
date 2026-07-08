@@ -6,6 +6,7 @@ import { useRouter, useParams } from 'next/navigation'
 
 import { COUNTRIES, COUNTRY_CURRENCY } from '@/lib/countries'
 import BrowseGroupsModal from '@/components/BrowseGroupsModal'
+import CreateGroupButton from '@/components/CreateGroupButton'
 
 export default function SalesEditStudentPage() {
   const router = useRouter()
@@ -172,6 +173,8 @@ export default function SalesEditStudentPage() {
                 style={{ whiteSpace: 'nowrap', background: '#065F46', color: '#fff', padding: '9px 16px', borderRadius: '8px', border: 'none', fontSize: '13px', fontWeight: 600, cursor: 'pointer' }}>
                 Browse Groups
               </button>
+              <CreateGroupButton studentId={id} studentName={form.name ?? ''} studentPhone={form.phone ?? null}
+                onCreated={jid => setForm((f: any) => ({ ...f, whatsapp_group_id: jid }))} />
               {form.whatsapp_group_id && (
                 <button type="button" onClick={() => setForm((f: any) => ({ ...f, whatsapp_group_id: '' }))}
                   style={{ whiteSpace: 'nowrap', background: '#FEF2F2', color: '#DC2626', padding: '9px 14px', borderRadius: '8px', border: '1px solid #FECACA', fontSize: '13px', cursor: 'pointer' }}>

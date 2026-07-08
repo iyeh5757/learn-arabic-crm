@@ -33,6 +33,8 @@ export default function InboxClient({ currentUserId, reps, countries, rolePrefix
   const [quickReplies, setQuickReplies] = useState<QuickReply[]>([])
   const [manageQR, setManageQR] = useState(false)
   const [qrLabel, setQrLabel] = useState(''); const [qrText, setQrText] = useState('')
+  const [newGroup, setNewGroup] = useState(false)
+  const [ngName, setNgName] = useState(''); const [ngNumbers, setNgNumbers] = useState(''); const [ngBusy, setNgBusy] = useState(false)
   const threadRef = useRef<HTMLDivElement>(null)
   const selectedId = selected?.id
 
@@ -147,6 +149,20 @@ export default function InboxClient({ currentUserId, reps, countries, rolePrefix
     loadQuickReplies()
   }
 
+  async function createGroup() {
+    const numbers = ngNumbers.split(',').map(s => s.trim()).filter(Boolean)
+    if (!ngName.trim() || numbers.length === 0) return
+    setNgBusy(true)
+    const res = await fetch('/api/whatsapp/groups/create', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ subject: ngName.trim(), participants: numbers }),
+    })
+    const data = await res.json()
+    setNgBusy(false)
+    if (res.ok && data.jid) { setNewGroup(false); setNgName(''); setNgNumbers(''); loadConvs(); alert('✅ Group created.') }
+    else alert(`Couldn't create group: ${data?.error ?? 'unknown error'}`)
+  }
+
   const filtered = convs.filter(c => !search || (c.name ?? '').toLowerCase().includes(search.toLowerCase()) || (c.phone ?? '').includes(search))
   const repName = (id: string | null) => id ? (reps.find(r => r.id === id)?.name ?? '—') : null
   const fmtTime = (iso: string | null) => iso ? new Date(iso).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''
@@ -158,6 +174,13 @@ export default function InboxClient({ currentUserId, reps, countries, rolePrefix
       {/* Conversation list */}
       <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '14px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ padding: '12px', borderBottom: '1px solid #F1F5F9', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: '13px', fontWeight: 800, color: '#0F172A' }}>Conversations</span>
+            <button type="button" onClick={() => setNewGroup(true)}
+              style={{ fontSize: '11px', color: '#065F46', background: '#F0FDF4', border: '1px solid #86EFAC', borderRadius: '8px', padding: '5px 10px', cursor: 'pointer', fontWeight: 700 }}>
+              ＋ New group
+            </button>
+          </div>
           <input placeholder="Search name or number…" value={search} onChange={e => setSearch(e.target.value)}
             style={{ ...sel, width: '100%', boxSizing: 'border-box' }} />
           <div style={{ display: 'flex', gap: '6px' }}>
@@ -309,6 +332,31 @@ export default function InboxClient({ currentUserId, reps, countries, rolePrefix
           </>
         )}
       </div>
+
+      {/* New group */}
+      {newGroup && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
+          onClick={() => setNewGroup(false)}>
+          <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '420px', padding: '20px' }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontWeight: 800, fontSize: '15px', marginBottom: '4px' }}>➕ New WhatsApp group</div>
+            <p style={{ fontSize: '12px', color: '#64748B', margin: '0 0 12px' }}>Your business number becomes the group admin.</p>
+            <label style={{ fontSize: '11px', color: '#64748B' }}>Group name</label>
+            <input value={ngName} onChange={e => setNgName(e.target.value)} placeholder="e.g. Support · Ahmed"
+              style={{ width: '100%', padding: '9px 11px', border: '1px solid #E2E8F0', borderRadius: '9px', fontSize: '13px', outline: 'none', boxSizing: 'border-box', margin: '3px 0 10px' }} />
+            <label style={{ fontSize: '11px', color: '#64748B' }}>Participant numbers (comma-separated, with country code)</label>
+            <textarea value={ngNumbers} onChange={e => setNgNumbers(e.target.value)} placeholder="201001234567, 447700900123" rows={2}
+              style={{ width: '100%', padding: '9px 11px', border: '1px solid #E2E8F0', borderRadius: '9px', fontSize: '13px', outline: 'none', boxSizing: 'border-box', margin: '3px 0 12px', resize: 'vertical', fontFamily: 'inherit' }} />
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button onClick={() => setNewGroup(false)} disabled={ngBusy}
+                style={{ background: '#fff', color: '#475569', border: '1px solid #E2E8F0', borderRadius: '9px', padding: '8px 14px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={createGroup} disabled={ngBusy || !ngName.trim() || !ngNumbers.trim()}
+                style={{ background: '#0D1B2A', color: '#E8C97A', border: 'none', borderRadius: '9px', padding: '8px 16px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', opacity: (ngBusy || !ngName.trim() || !ngNumbers.trim()) ? 0.6 : 1 }}>
+                {ngBusy ? 'Creating…' : 'Create group'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Manage quick replies */}
       {manageQR && (
