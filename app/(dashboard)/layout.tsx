@@ -18,6 +18,7 @@ const NAV: Record<string, { label: string; href: string; emoji: string }[]> = {
     { label: 'Payments',       href: '/admin/payments',     emoji: '💳' },
     { label: 'Teachers',       href: '/admin/teachers',     emoji: '👩‍🏫' },
     { label: 'Users',          href: '/admin/users',        emoji: '👥' },
+    { label: 'Team Inbox',     href: '/admin/inbox',        emoji: '💬' },
     { label: 'Reminders',      href: '/admin/reminders',    emoji: '🔔' },
     { label: 'Reports',        href: '/admin/reports',      emoji: '📈' },
     { label: 'Analytics',      href: '/admin/analytics',    emoji: '🤖' },
@@ -35,6 +36,7 @@ const NAV: Record<string, { label: string; href: string; emoji: string }[]> = {
   sales: [
     { label: 'Dashboard',   href: '/sales',             emoji: '📊' },
     { label: 'Students',    href: '/sales/students',    emoji: '👨‍🎓' },
+    { label: 'Team Inbox',  href: '/sales/inbox',       emoji: '💬' },
     { label: 'Payments',    href: '/sales/payments',    emoji: '💳' },
     { label: 'Commissions', href: '/sales/commissions', emoji: '💰' },
     { label: 'Calendar',    href: '/sales/calendar',    emoji: '🗓️' },
@@ -50,6 +52,7 @@ const NAV: Record<string, { label: string; href: string; emoji: string }[]> = {
   ],
   supervisor: [
     { label: 'Dashboard', href: '/supervisor',           emoji: '📊' },
+    { label: 'Team Inbox', href: '/supervisor/inbox',    emoji: '💬' },
     { label: 'Sessions',  href: '/supervisor/sessions',  emoji: '📅' },
     { label: 'Team Calendar', href: '/supervisor/calendar', emoji: '🗓️' },
     { label: 'Availability', href: '/supervisor/calendar/availability', emoji: '🔍' },

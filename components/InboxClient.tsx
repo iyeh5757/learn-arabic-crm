@@ -1,0 +1,194 @@
+'use client'
+// components/InboxClient.tsx
+// Shared WhatsApp team inbox. Lists conversations (filter by country / status /
+// assignee), shows the chat thread, and lets staff reply — all through the one
+// business number via Evolution. Polls every few seconds for new messages.
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { createClient } from '@/lib/supabase/client'
+
+type Conv = {
+  id: string; wa_jid: string; name: string | null; phone: string | null; is_group: boolean
+  student_id: string | null; country: string | null; assigned_to: string | null
+  status: string; last_message_at: string | null; last_message_preview: string | null
+  last_direction: string | null; unread_count: number
+}
+type Msg = { id: string; direction: string; body: string | null; media_type: string | null; sender_name: string | null; created_at: string }
+type Rep = { id: string; name: string }
+
+export default function InboxClient({ currentUserId, reps, countries }: { currentUserId: string; reps: Rep[]; countries: string[] }) {
+  const supabase = createClient()
+  const [convs, setConvs] = useState<Conv[]>([])
+  const [selected, setSelected] = useState<Conv | null>(null)
+  const [msgs, setMsgs] = useState<Msg[]>([])
+  const [reply, setReply] = useState('')
+  const [sending, setSending] = useState(false)
+  const [search, setSearch] = useState('')
+  const [fCountry, setFCountry] = useState('')
+  const [fStatus, setFStatus] = useState('open')
+  const [fAssignee, setFAssignee] = useState('')       // '', 'me', 'unassigned'
+  const threadRef = useRef<HTMLDivElement>(null)
+  const selectedId = selected?.id
+
+  const loadConvs = useCallback(async () => {
+    let q = supabase.from('wa_conversations').select('*').order('last_message_at', { ascending: false, nullsFirst: false }).limit(300)
+    if (fStatus) q = q.eq('status', fStatus)
+    if (fCountry) q = q.eq('country', fCountry)
+    if (fAssignee === 'me') q = q.eq('assigned_to', currentUserId)
+    else if (fAssignee === 'unassigned') q = q.is('assigned_to', null)
+    const { data } = await q
+    setConvs(data ?? [])
+  }, [fStatus, fCountry, fAssignee, currentUserId])
+
+  const loadMsgs = useCallback(async (convId: string) => {
+    const { data } = await supabase.from('wa_messages').select('*').eq('conversation_id', convId).order('created_at').limit(500)
+    setMsgs(data ?? [])
+  }, [])
+
+  useEffect(() => { loadConvs() }, [loadConvs])
+  useEffect(() => { if (selectedId) loadMsgs(selectedId) }, [selectedId, loadMsgs])
+
+  // Poll for updates
+  useEffect(() => {
+    const t = setInterval(() => { loadConvs(); if (selectedId) loadMsgs(selectedId) }, 5000)
+    return () => clearInterval(t)
+  }, [loadConvs, loadMsgs, selectedId])
+
+  useEffect(() => { threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight }) }, [msgs])
+
+  async function openConv(c: Conv) {
+    setSelected(c)
+    if (c.unread_count > 0) {
+      await supabase.from('wa_conversations').update({ unread_count: 0 }).eq('id', c.id)
+      setConvs(prev => prev.map(x => x.id === c.id ? { ...x, unread_count: 0 } : x))
+    }
+  }
+
+  async function send() {
+    if (!selected || !reply.trim() || sending) return
+    setSending(true)
+    const res = await fetch('/api/whatsapp/send', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ conversation_id: selected.id, text: reply.trim() }),
+    })
+    const data = await res.json()
+    setSending(false)
+    if (res.ok) { setReply(''); loadMsgs(selected.id); loadConvs() }
+    else alert(`Failed to send: ${data?.error ?? 'unknown error'}`)
+  }
+
+  async function setAssignee(convId: string, to: string) {
+    await supabase.from('wa_conversations').update({ assigned_to: to || null }).eq('id', convId)
+    setConvs(prev => prev.map(x => x.id === convId ? { ...x, assigned_to: to || null } : x))
+    if (selected?.id === convId) setSelected(s => s && { ...s, assigned_to: to || null })
+  }
+  async function setStatus(convId: string, status: string) {
+    await supabase.from('wa_conversations').update({ status }).eq('id', convId)
+    setConvs(prev => prev.filter(x => fStatus ? x.status === fStatus || x.id !== convId : true).map(x => x.id === convId ? { ...x, status } : x))
+    if (selected?.id === convId) setSelected(s => s && { ...s, status })
+  }
+
+  const filtered = convs.filter(c => !search || (c.name ?? '').toLowerCase().includes(search.toLowerCase()) || (c.phone ?? '').includes(search))
+  const repName = (id: string | null) => id ? (reps.find(r => r.id === id)?.name ?? '—') : null
+  const fmtTime = (iso: string | null) => iso ? new Date(iso).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : ''
+
+  const sel: React.CSSProperties = { padding: '7px 9px', border: '1px solid #E2E8F0', borderRadius: '8px', fontSize: '12px', background: '#fff', outline: 'none' }
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: '14px', height: 'calc(100vh - 150px)' }}>
+      {/* Conversation list */}
+      <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '14px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ padding: '12px', borderBottom: '1px solid #F1F5F9', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <input placeholder="Search name or number…" value={search} onChange={e => setSearch(e.target.value)}
+            style={{ ...sel, width: '100%', boxSizing: 'border-box' }} />
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <select value={fStatus} onChange={e => setFStatus(e.target.value)} style={{ ...sel, flex: 1 }}>
+              <option value="open">Open</option><option value="pending">Pending</option><option value="closed">Closed</option><option value="">All</option>
+            </select>
+            <select value={fAssignee} onChange={e => setFAssignee(e.target.value)} style={{ ...sel, flex: 1 }}>
+              <option value="">Everyone</option><option value="me">Mine</option><option value="unassigned">Unassigned</option>
+            </select>
+          </div>
+          <select value={fCountry} onChange={e => setFCountry(e.target.value)} style={{ ...sel, width: '100%' }}>
+            <option value="">All countries</option>
+            {countries.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </div>
+        <div style={{ overflowY: 'auto', flex: 1 }}>
+          {filtered.length === 0 && <div style={{ padding: '28px', textAlign: 'center', color: '#9CA3AF', fontSize: '13px' }}>No conversations</div>}
+          {filtered.map(c => (
+            <div key={c.id} onClick={() => openConv(c)}
+              style={{ padding: '11px 13px', cursor: 'pointer', borderBottom: '1px solid #F8FAFC',
+                background: selectedId === c.id ? '#EFF6FF' : c.unread_count > 0 ? '#F0FDF4' : '#fff' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                <span style={{ fontWeight: 700, fontSize: '13px', color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {c.is_group ? '👥 ' : ''}{c.name || c.phone || 'Unknown'}
+                </span>
+                <span style={{ fontSize: '10px', color: '#94A3B8', whiteSpace: 'nowrap' }}>{fmtTime(c.last_message_at)}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', marginTop: '3px' }}>
+                <span style={{ fontSize: '12px', color: '#64748B', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {c.last_direction === 'out' ? '↩ ' : ''}{c.last_message_preview ?? ''}
+                </span>
+                {c.unread_count > 0 && <span style={{ background: '#16A34A', color: '#fff', fontSize: '10px', fontWeight: 700, borderRadius: '10px', padding: '1px 7px' }}>{c.unread_count}</span>}
+              </div>
+              <div style={{ display: 'flex', gap: '5px', marginTop: '4px' }}>
+                {c.country && <span style={{ fontSize: '10px', color: '#475569', background: '#F1F5F9', borderRadius: '6px', padding: '1px 6px' }}>{c.country}</span>}
+                {c.assigned_to && <span style={{ fontSize: '10px', color: '#3730A3', background: '#E0E7FF', borderRadius: '6px', padding: '1px 6px' }}>{repName(c.assigned_to)}</span>}
+                {!c.student_id && !c.is_group && <span style={{ fontSize: '10px', color: '#B45309', background: '#FEF3C7', borderRadius: '6px', padding: '1px 6px' }}>new</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Thread */}
+      <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '14px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {!selected ? (
+          <div style={{ margin: 'auto', color: '#9CA3AF', fontSize: '14px' }}>Select a conversation</div>
+        ) : (
+          <>
+            <div style={{ padding: '12px 16px', borderBottom: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: '15px', color: '#0F172A' }}>{selected.is_group ? '👥 ' : ''}{selected.name || selected.phone}</div>
+                <div style={{ fontSize: '11px', color: '#94A3B8' }}>{selected.phone}{selected.country ? ` · ${selected.country}` : ''}</div>
+              </div>
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                <select value={selected.assigned_to ?? ''} onChange={e => setAssignee(selected.id, e.target.value)} style={sel} title="Assign to">
+                  <option value="">Unassigned</option>
+                  {reps.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                </select>
+                <select value={selected.status} onChange={e => setStatus(selected.id, e.target.value)} style={sel} title="Status">
+                  <option value="open">Open</option><option value="pending">Pending</option><option value="closed">Closed</option>
+                </select>
+              </div>
+            </div>
+
+            <div ref={threadRef} style={{ flex: 1, overflowY: 'auto', padding: '16px', background: '#F8FAFC', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {msgs.map(m => (
+                <div key={m.id} style={{ alignSelf: m.direction === 'out' ? 'flex-end' : 'flex-start', maxWidth: '72%' }}>
+                  <div style={{ background: m.direction === 'out' ? '#0D1B2A' : '#fff', color: m.direction === 'out' ? '#fff' : '#0F172A',
+                    border: m.direction === 'out' ? 'none' : '1px solid #E5E7EB', borderRadius: '12px', padding: '9px 12px', fontSize: '13px', whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
+                    {m.body}
+                  </div>
+                  <div style={{ fontSize: '10px', color: '#94A3B8', marginTop: '2px', textAlign: m.direction === 'out' ? 'right' : 'left' }}>
+                    {m.direction === 'out' && m.sender_name ? `${m.sender_name} · ` : ''}{fmtTime(m.created_at)}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ padding: '12px', borderTop: '1px solid #F1F5F9', display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
+              <textarea value={reply} onChange={e => setReply(e.target.value)} placeholder="Type a reply…" rows={1}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }}
+                style={{ flex: 1, padding: '10px 12px', border: '1px solid #E2E8F0', borderRadius: '10px', fontSize: '13px', outline: 'none', resize: 'none', fontFamily: 'inherit', maxHeight: '120px' }} />
+              <button onClick={send} disabled={sending || !reply.trim()}
+                style={{ background: '#0D1B2A', color: '#E8C97A', border: 'none', borderRadius: '10px', padding: '10px 18px', fontSize: '13px', fontWeight: 700, cursor: sending ? 'not-allowed' : 'pointer', opacity: sending || !reply.trim() ? 0.6 : 1 }}>
+                {sending ? '…' : 'Send'}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
