@@ -89,11 +89,17 @@ export default function InboxClient({ currentUserId, reps, countries, rolePrefix
     return () => { supabase.removeChannel(ch) }
   }, [])
 
-  // Safety-net poll in case a realtime event is missed
+  // Poll as a reliable backup to realtime: the OPEN thread refreshes every 3s
+  // (what you're watching), the conversation list every 6s. A quick refresh also
+  // fires whenever the tab regains focus (browsers throttle timers in background).
   useEffect(() => {
-    const t = setInterval(() => { loadConvs(); if (selectedId) loadMsgs(selectedId) }, 20000)
-    return () => clearInterval(t)
-  }, [loadConvs, loadMsgs, selectedId])
+    const msgT = setInterval(() => { if (selIdRef.current) loadMsgsRef.current(selIdRef.current) }, 3000)
+    const convT = setInterval(() => { loadConvsRef.current() }, 6000)
+    const onFocus = () => { loadConvsRef.current(); if (selIdRef.current) loadMsgsRef.current(selIdRef.current) }
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onFocus)
+    return () => { clearInterval(msgT); clearInterval(convT); window.removeEventListener('focus', onFocus); document.removeEventListener('visibilitychange', onFocus) }
+  }, [])
 
   useEffect(() => { threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight }) }, [msgs])
 
