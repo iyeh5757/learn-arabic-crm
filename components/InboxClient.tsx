@@ -35,6 +35,8 @@ export default function InboxClient({ currentUserId, reps, countries, rolePrefix
   const [qrLabel, setQrLabel] = useState(''); const [qrText, setQrText] = useState('')
   const [newGroup, setNewGroup] = useState(false)
   const [ngName, setNgName] = useState(''); const [ngNumbers, setNgNumbers] = useState(''); const [ngBusy, setNgBusy] = useState(false)
+  const [newChat, setNewChat] = useState(false)
+  const [ncPhone, setNcPhone] = useState(''); const [ncText, setNcText] = useState(''); const [ncBusy, setNcBusy] = useState(false)
   const threadRef = useRef<HTMLDivElement>(null)
   const selectedId = selected?.id
 
@@ -155,6 +157,25 @@ export default function InboxClient({ currentUserId, reps, countries, rolePrefix
     loadQuickReplies()
   }
 
+  async function startChat() {
+    if (!ncPhone.trim() || !ncText.trim()) return
+    setNcBusy(true)
+    const res = await fetch('/api/whatsapp/start', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: ncPhone.trim(), text: ncText.trim() }),
+    })
+    const data = await res.json()
+    setNcBusy(false)
+    if (res.ok) {
+      setNewChat(false); setNcPhone(''); setNcText('')
+      await loadConvs()
+      if (data.conversation_id) {
+        const { data: c } = await supabase.from('wa_conversations').select('*').eq('id', data.conversation_id).single()
+        if (c) openConv(c as Conv)
+      }
+    } else alert(`Couldn't start chat: ${data?.error ?? 'unknown error'}`)
+  }
+
   async function createGroup() {
     const numbers = ngNumbers.split(',').map(s => s.trim()).filter(Boolean)
     if (!ngName.trim() || numbers.length === 0) return
@@ -182,12 +203,18 @@ export default function InboxClient({ currentUserId, reps, countries, rolePrefix
       {/* Conversation list */}
       <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '14px', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <div style={{ padding: '12px', borderBottom: '1px solid #F1F5F9', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px' }}>
             <span style={{ fontSize: '13px', fontWeight: 800, color: '#0F172A' }}>Conversations</span>
-            <button type="button" onClick={() => setNewGroup(true)}
-              style={{ fontSize: '11px', color: '#065F46', background: '#F0FDF4', border: '1px solid #86EFAC', borderRadius: '8px', padding: '5px 10px', cursor: 'pointer', fontWeight: 700 }}>
-              ＋ New group
-            </button>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <button type="button" onClick={() => setNewChat(true)}
+                style={{ fontSize: '11px', color: '#1E40AF', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '8px', padding: '5px 10px', cursor: 'pointer', fontWeight: 700 }}>
+                ✉️ New chat
+              </button>
+              <button type="button" onClick={() => setNewGroup(true)}
+                style={{ fontSize: '11px', color: '#065F46', background: '#F0FDF4', border: '1px solid #86EFAC', borderRadius: '8px', padding: '5px 10px', cursor: 'pointer', fontWeight: 700 }}>
+                ＋ Group
+              </button>
+            </div>
           </div>
           <input placeholder="Search name or number…" value={search} onChange={e => setSearch(e.target.value)}
             style={{ ...sel, width: '100%', boxSizing: 'border-box' }} />
@@ -346,6 +373,31 @@ export default function InboxClient({ currentUserId, reps, countries, rolePrefix
           </>
         )}
       </div>
+
+      {/* New chat with a number */}
+      {newChat && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.45)', zIndex: 200, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}
+          onClick={() => setNewChat(false)}>
+          <div style={{ background: '#fff', borderRadius: '16px', width: '100%', maxWidth: '420px', padding: '20px' }} onClick={e => e.stopPropagation()}>
+            <div style={{ fontWeight: 800, fontSize: '15px', marginBottom: '4px' }}>✉️ New chat</div>
+            <p style={{ fontSize: '12px', color: '#64748B', margin: '0 0 12px' }}>Send the first message to a number. Only message people who expect to hear from you.</p>
+            <label style={{ fontSize: '11px', color: '#64748B' }}>Phone number (with country code)</label>
+            <input value={ncPhone} onChange={e => setNcPhone(e.target.value)} placeholder="e.g. 201001234567"
+              style={{ width: '100%', padding: '9px 11px', border: '1px solid #E2E8F0', borderRadius: '9px', fontSize: '13px', outline: 'none', boxSizing: 'border-box', margin: '3px 0 10px' }} />
+            <label style={{ fontSize: '11px', color: '#64748B' }}>Message</label>
+            <textarea value={ncText} onChange={e => setNcText(e.target.value)} placeholder="Type your first message…" rows={3}
+              style={{ width: '100%', padding: '9px 11px', border: '1px solid #E2E8F0', borderRadius: '9px', fontSize: '13px', outline: 'none', boxSizing: 'border-box', margin: '3px 0 12px', resize: 'vertical', fontFamily: 'inherit' }} />
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button onClick={() => setNewChat(false)} disabled={ncBusy}
+                style={{ background: '#fff', color: '#475569', border: '1px solid #E2E8F0', borderRadius: '9px', padding: '8px 14px', fontSize: '12px', fontWeight: 700, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={startChat} disabled={ncBusy || !ncPhone.trim() || !ncText.trim()}
+                style={{ background: '#0D1B2A', color: '#E8C97A', border: 'none', borderRadius: '9px', padding: '8px 16px', fontSize: '12px', fontWeight: 700, cursor: 'pointer', opacity: (ncBusy || !ncPhone.trim() || !ncText.trim()) ? 0.6 : 1 }}>
+                {ncBusy ? 'Sending…' : 'Send'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* New group */}
       {newGroup && (
