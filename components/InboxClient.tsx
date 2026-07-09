@@ -7,7 +7,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 type Conv = {
-  id: string; wa_jid: string; name: string | null; phone: string | null; is_group: boolean
+  id: string; wa_jid: string; name: string | null; wa_name: string | null; phone: string | null; is_group: boolean
   student_id: string | null; country: string | null; assigned_to: string | null
   status: string; last_message_at: string | null; last_message_preview: string | null
   last_direction: string | null; unread_count: number
@@ -212,7 +212,7 @@ export default function InboxClient({ currentUserId, reps, countries, rolePrefix
                 background: selectedId === c.id ? '#EFF6FF' : c.unread_count > 0 ? '#F0FDF4' : '#fff' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
                 <span style={{ fontWeight: 700, fontSize: '13px', color: '#0F172A', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {c.is_group ? '👥 ' : ''}{c.name || c.phone || 'Unknown'}
+                  {c.is_group ? '👥 ' : ''}{c.wa_name || c.name || c.phone || 'Unknown'}
                 </span>
                 <span style={{ fontSize: '10px', color: '#94A3B8', whiteSpace: 'nowrap' }}>{fmtTime(c.last_message_at)}</span>
               </div>
@@ -240,10 +240,16 @@ export default function InboxClient({ currentUserId, reps, countries, rolePrefix
           <>
             <div style={{ padding: '12px 16px', borderBottom: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
               <div>
-                <div style={{ fontWeight: 800, fontSize: '15px', color: '#0F172A' }}>{selected.is_group ? '👥 ' : ''}{selected.name || selected.phone}</div>
+                <div style={{ fontWeight: 800, fontSize: '15px', color: '#0F172A' }}>{selected.is_group ? '👥 ' : ''}{selected.wa_name || selected.name || selected.phone}</div>
                 <div style={{ fontSize: '11px', color: '#94A3B8' }}>{selected.phone}{selected.country ? ` · ${selected.country}` : ''}</div>
               </div>
               <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                {!selected.is_group && selected.phone && (
+                  <a href={`tel:+${selected.phone}`} title="Call this number (opens your dialer)"
+                    style={{ display: 'flex', alignItems: 'center', gap: '5px', background: '#DCFCE7', color: '#15803D', border: 'none', borderRadius: '9px', padding: '7px 12px', fontSize: '12px', fontWeight: 700, textDecoration: 'none' }}>
+                    📞 Call
+                  </a>
+                )}
                 <select value={selected.assigned_to ?? ''} onChange={e => setAssignee(selected.id, e.target.value)} style={sel} title="Assign to">
                   <option value="">Unassigned</option>
                   {reps.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}

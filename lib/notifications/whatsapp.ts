@@ -163,6 +163,22 @@ export async function sendWhatsAppReminder(
   }
 }
 
+// Fetch a group's real subject (title) from Evolution. Message events don't
+// carry the subject, so we look it up. Returns null on failure.
+export async function getGroupSubject(groupJid: string): Promise<string | null> {
+  if (!API_URL || !API_KEY || !INSTANCE || !groupJid) return null
+  try {
+    const res = await fetch(`${API_URL}/group/findGroupInfos/${INSTANCE}?groupJid=${encodeURIComponent(groupJid)}`, {
+      headers: { apikey: API_KEY },
+    })
+    if (!res.ok) return null
+    const j = await res.json().catch(() => null)
+    const g = Array.isArray(j) ? j[0] : (j?.group ?? j)
+    const subject = g?.subject ?? g?.name ?? null
+    return typeof subject === 'string' && subject.trim() ? subject.trim() : null
+  } catch { return null }
+}
+
 // Download a media message's bytes from Evolution (base64). `raw` is the raw
 // message payload we captured from the webhook. Returns the decoded buffer +
 // mimetype, or null on failure. Tries a couple of request shapes across versions.
