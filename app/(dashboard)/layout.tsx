@@ -53,6 +53,7 @@ const NAV: Record<string, { label: string; href: string; emoji: string }[]> = {
   supervisor: [
     { label: 'Dashboard', href: '/supervisor',           emoji: '📊' },
     { label: 'Team Inbox', href: '/supervisor/inbox',    emoji: '💬' },
+    { label: 'Students',  href: '/supervisor/students',  emoji: '👨‍🎓' },
     { label: 'Sessions',  href: '/supervisor/sessions',  emoji: '📅' },
     { label: 'Team Calendar', href: '/supervisor/calendar', emoji: '🗓️' },
     { label: 'Availability', href: '/supervisor/calendar/availability', emoji: '🔍' },

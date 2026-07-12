@@ -20,7 +20,7 @@ export default function SessionsPage() {
 
   useEffect(() => {
     supabase.from('teachers').select('id, profile:profiles!teachers_user_id_fkey(name)').eq('is_active', true).then(({ data }) => setTeachers(data ?? []))
-    supabase.from('students').select('id, name').order('name').then(({ data }) => setStudents(data ?? []))
+    supabase.from('students').select('id, name, assigned_teacher_id').order('name').then(({ data }) => setStudents(data ?? []))
   }, [])
 
   useEffect(() => {
@@ -62,15 +62,15 @@ export default function SessionsPage() {
           {/* Month filter */}
           <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)}
             style={{ ...inp, minWidth: '150px' }} />
-          {/* Teacher filter */}
-          <select style={{ ...inp, minWidth: '180px' }} value={selectedTeacher} onChange={e => setSelectedTeacher(e.target.value)}>
+          {/* Teacher filter — choosing a teacher scopes the student list below */}
+          <select style={{ ...inp, minWidth: '180px' }} value={selectedTeacher} onChange={e => { setSelectedTeacher(e.target.value); setSelectedStudent('') }}>
             <option value="">All Teachers</option>
             {teachers.map((t: any) => <option key={t.id} value={t.id}>{t.profile?.name}</option>)}
           </select>
-          {/* Student filter */}
+          {/* Student filter — limited to the chosen teacher's students */}
           <select style={{ ...inp, minWidth: '180px' }} value={selectedStudent} onChange={e => setSelectedStudent(e.target.value)}>
-            <option value="">All Students</option>
-            {students.map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
+            <option value="">{selectedTeacher ? 'All of this teacher’s students' : 'All Students'}</option>
+            {students.filter((s: any) => !selectedTeacher || s.assigned_teacher_id === selectedTeacher).map((s: any) => <option key={s.id} value={s.id}>{s.name}</option>)}
           </select>
           {(selectedTeacher || selectedStudent) && (
             <button onClick={() => { setSelectedTeacher(''); setSelectedStudent('') }} style={{ background: '#FEF2F2', color: '#DC2626', border: '1px solid #FECACA', padding: '8px 14px', borderRadius: '8px', fontSize: '13px', cursor: 'pointer', fontWeight: '500' }}>

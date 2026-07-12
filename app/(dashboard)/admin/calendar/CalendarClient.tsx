@@ -144,8 +144,9 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
   function refresh() { calRef.current?.getApi()?.refetchEvents() }
 
   function onTeacherFilter(id: string) {
-    setFilterTeacher(id); setFilterSupervisor('')
-    filterTeacherRef.current = id; filterSupervisorRef.current = ''
+    // Keep the supervisor scope so you can narrow to one teacher within a team
+    setFilterTeacher(id)
+    filterTeacherRef.current = id
     refresh()
   }
   function onSupervisorFilter(id: string) {
@@ -403,8 +404,8 @@ export default function CalendarClient({ sessionTypes, teachers, supervisors, st
           <span style={{ fontSize: '12px', color: '#94A3B8' }}>👩‍🏫 Teacher</span>
           <select value={filterTeacher} onChange={e => onTeacherFilter(e.target.value)}
             style={{ padding: '7px 10px', border: '1px solid #E2E8F0', borderRadius: '9px', fontSize: '13px', outline: 'none', background: filterTeacher ? '#0D1B2A' : '#fff', color: filterTeacher ? '#E8C97A' : '#334155', fontWeight: filterTeacher ? 700 : 400 }}>
-            <option value="">All teachers</option>
-            {teachers.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            <option value="">{filterSupervisor ? 'All of this team' : 'All teachers'}</option>
+            {teachers.filter(t => !filterSupervisor || t.supervisor_id === filterSupervisor).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
         </div>
         {showSupervisorFilter && (
