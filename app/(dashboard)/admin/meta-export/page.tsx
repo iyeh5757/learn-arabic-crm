@@ -40,7 +40,8 @@ export default function MetaExportPage() {
         body: JSON.stringify({ from: new Date(from).toISOString(), to: new Date(to).toISOString() }),
       })
       const d = await res.json()
-      setSendMsg(res.ok ? `✅ Sent ${d.sent} of ${d.collected} events to Meta.` : `⚠️ ${d.error ?? 'Failed'}`)
+      const oldNote = d.skippedOld ? ` (${d.skippedOld} skipped — older than 7 days, which Meta won't accept)` : ''
+      setSendMsg(res.ok ? `✅ Sent ${d.sent} of ${d.collected} events to Meta${oldNote}.` : `⚠️ ${d.error ?? 'Failed'}${oldNote}`)
     } catch (e: any) { setSendMsg(`⚠️ ${e?.message ?? 'Failed'}`) }
     setSending(false)
   }
@@ -161,7 +162,7 @@ export default function MetaExportPage() {
             {busy ? 'Generating…' : '⬇ CSV'}
           </button>
         </div>
-        <p style={{ fontSize: '12px', color: '#94A3B8', margin: '12px 0 0' }}>Default = last 24 hours. Sending is automatic daily; use “Send to Meta now” to push a range on demand.</p>
+        <p style={{ fontSize: '12px', color: '#94A3B8', margin: '12px 0 0' }}>Default = last 24 hours. Sending is automatic daily; use “Send to Meta now” to push a range on demand. <strong>Meta only accepts events from the last 7 days</strong> — older conversions can&apos;t be back-filled (the daily job keeps everything current going forward).</p>
 
         {error && <div style={{ marginTop: '12px', background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626', padding: '10px 14px', borderRadius: '8px', fontSize: '13px' }}>{error}</div>}
         {sendMsg && <div style={{ marginTop: '12px', background: '#EFF6FF', border: '1px solid #BFDBFE', color: '#1E40AF', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600 }}>{sendMsg}</div>}

@@ -22,6 +22,6 @@ export async function POST(req: Request) {
   const events = await collectConversionEvents(supabase, new Date(from).toISOString(), new Date(to).toISOString())
   const result = await sendCapiEvents(events, test_event_code?.trim() ? { testEventCode: test_event_code.trim() } : undefined)
 
-  if (!result.ok) return NextResponse.json({ error: result.error, collected: events.length, response: result.response }, { status: 502 })
-  return NextResponse.json({ ok: true, collected: events.length, sent: result.sent, meta: result.response })
+  if (!result.ok) return NextResponse.json({ error: result.error, collected: events.length, sent: result.sent, skippedOld: result.skippedOld, response: result.response }, { status: 502 })
+  return NextResponse.json({ ok: true, collected: events.length, sent: result.sent, skippedOld: result.skippedOld ?? 0, meta: result.response })
 }

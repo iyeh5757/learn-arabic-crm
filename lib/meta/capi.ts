@@ -54,26 +54,39 @@ function buildEvent(e: CapiEvent) {
 
 export async function sendCapiEvents(
   events: CapiEvent[], opts?: { testEventCode?: string }
-): Promise<{ ok: boolean; sent: number; error?: string; response?: any }> {
+): Promise<{ ok: boolean; sent: number; skippedOld?: number; error?: string; response?: any }> {
   const token = (process.env.META_CONVERSIONS_TOKEN ?? '').trim()
   if (!token) return { ok: false, sent: 0, error: 'META_CONVERSIONS_TOKEN is not set (add it in Vercel).' }
   if (events.length === 0) return { ok: true, sent: 0 }
 
-  // Only include events that have at least one match key
+  // Only events with at least one match key…
   const usable = events.filter(e => e.email || (e.phone && normPhone(e.phone)))
-  if (usable.length === 0) return { ok: true, sent: 0 }
+  // …and Meta only accepts events from the last 7 days (older ones are rejected).
+  const now = Math.floor(Date.now() / 1000)
+  const minTime = now - 7 * 24 * 3600 + 120
+  const fresh = usable.filter(e => e.event_time >= minTime && e.event_time <= now + 120)
+  const skippedOld = usable.length - fresh.length
+  if (fresh.length === 0) return { ok: true, sent: 0, skippedOld }
 
-  const body: Record<string, any> = { data: usable.map(buildEvent) }
-  if (opts?.testEventCode) body.test_event_code = opts.testEventCode
-
+  const url = `${GRAPH}/${API_VERSION}/${DATASET_ID}/events?access_token=${encodeURIComponent(token)}`
+  let sent = 0
   try {
-    const res = await fetch(`${GRAPH}/${API_VERSION}/${DATASET_ID}/events?access_token=${encodeURIComponent(token)}`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
-    })
-    const json = await res.json().catch(() => null)
-    if (!res.ok) return { ok: false, sent: 0, error: json?.error?.message ?? `HTTP ${res.status}`, response: json }
-    return { ok: true, sent: usable.length, response: json }
+    // Meta caps ~1000 events per request — send in batches.
+    for (let i = 0; i < fresh.length; i += 1000) {
+      const batch = fresh.slice(i, i + 1000)
+      const body: Record<string, any> = { data: batch.map(buildEvent) }
+      if (opts?.testEventCode) body.test_event_code = opts.testEventCode
+      const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+      const json = await res.json().catch(() => null)
+      if (!res.ok) {
+        const err = json?.error
+        const msg = err?.error_user_msg ?? err?.message ?? `HTTP ${res.status}`
+        return { ok: false, sent, skippedOld, error: msg, response: json }
+      }
+      sent += batch.length
+    }
+    return { ok: true, sent, skippedOld }
   } catch (e: any) {
-    return { ok: false, sent: 0, error: e?.message ?? 'Network error' }
+    return { ok: false, sent, skippedOld, error: e?.message ?? 'Network error' }
   }
 }
