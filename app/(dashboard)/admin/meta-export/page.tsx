@@ -27,6 +27,36 @@ export default function MetaExportPage() {
   const [busy, setBusy] = useState(false)
   const [summary, setSummary] = useState<{ trial: number; purchase: number; renewal: number } | null>(null)
   const [error, setError] = useState('')
+  const [sending, setSending] = useState(false)
+  const [sendMsg, setSendMsg] = useState('')
+  const [testCode, setTestCode] = useState('')
+  const [testMsg, setTestMsg] = useState('')
+
+  async function sendNow() {
+    setSending(true); setSendMsg('')
+    try {
+      const res = await fetch('/api/meta/send-now', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ from: new Date(from).toISOString(), to: new Date(to).toISOString() }),
+      })
+      const d = await res.json()
+      setSendMsg(res.ok ? `✅ Sent ${d.sent} of ${d.collected} events to Meta.` : `⚠️ ${d.error ?? 'Failed'}`)
+    } catch (e: any) { setSendMsg(`⚠️ ${e?.message ?? 'Failed'}`) }
+    setSending(false)
+  }
+
+  async function sendTest() {
+    if (!testCode.trim()) { setTestMsg('Enter the test_event_code from Meta → Test Events'); return }
+    setTestMsg('Sending…')
+    try {
+      const res = await fetch('/api/meta/test', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ test_event_code: testCode.trim() }),
+      })
+      const d = await res.json()
+      setTestMsg(res.ok ? '✅ Test event sent — check Meta → Test Events (it should appear within a minute).' : `⚠️ ${d.error ?? 'Failed'}`)
+    } catch (e: any) { setTestMsg(`⚠️ ${e?.message ?? 'Failed'}`) }
+  }
 
   async function generate() {
     setBusy(true); setError(''); setSummary(null)
@@ -106,9 +136,9 @@ export default function MetaExportPage() {
   return (
     <div style={{ maxWidth: '760px', display: 'flex', flexDirection: 'column', gap: '18px' }}>
       <div>
-        <h1 style={{ fontSize: '22px', fontWeight: 800, color: '#111827', margin: 0 }}>🎯 Meta Conversions Export</h1>
+        <h1 style={{ fontSize: '22px', fontWeight: 800, color: '#111827', margin: 0 }}>🎯 Meta Conversions</h1>
         <p style={{ color: '#6B7280', fontSize: '14px', margin: '4px 0 0' }}>
-          Download your conversion events (trial / paid / renewal) as a CSV, then upload it to Meta Events Manager. Uses your existing students &amp; payments — nothing is sent automatically.
+          Your trial / paid / renewal events are sent to Meta&apos;s Conversions API <strong>automatically every day</strong>. You can also push a range on demand, send a test event, or download the raw CSV. Built from your existing students &amp; payments — no new data.
         </p>
       </div>
 
@@ -122,31 +152,48 @@ export default function MetaExportPage() {
             <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#6B7280', textTransform: 'uppercase', marginBottom: '5px' }}>To</label>
             <input type="datetime-local" value={to} onChange={e => setTo(e.target.value)} style={inp} />
           </div>
+          <button onClick={sendNow} disabled={sending}
+            style={{ background: '#1877F2', color: '#fff', border: 'none', borderRadius: '10px', padding: '11px 22px', fontSize: '14px', fontWeight: 700, cursor: sending ? 'not-allowed' : 'pointer', opacity: sending ? 0.7 : 1 }}>
+            {sending ? 'Sending…' : '📤 Send to Meta now'}
+          </button>
           <button onClick={generate} disabled={busy}
-            style={{ background: '#0D1B2A', color: '#E8C97A', border: 'none', borderRadius: '10px', padding: '11px 22px', fontSize: '14px', fontWeight: 700, cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.7 : 1 }}>
-            {busy ? 'Generating…' : '⬇ Download CSV'}
+            style={{ background: '#fff', color: '#0D1B2A', border: '1.5px solid #E2E8F0', borderRadius: '10px', padding: '11px 20px', fontSize: '14px', fontWeight: 700, cursor: busy ? 'not-allowed' : 'pointer', opacity: busy ? 0.7 : 1 }}>
+            {busy ? 'Generating…' : '⬇ CSV'}
           </button>
         </div>
-        <p style={{ fontSize: '12px', color: '#94A3B8', margin: '12px 0 0' }}>Default range = last 24 hours. Run it once a day.</p>
+        <p style={{ fontSize: '12px', color: '#94A3B8', margin: '12px 0 0' }}>Default = last 24 hours. Sending is automatic daily; use “Send to Meta now” to push a range on demand.</p>
 
         {error && <div style={{ marginTop: '12px', background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626', padding: '10px 14px', borderRadius: '8px', fontSize: '13px' }}>{error}</div>}
+        {sendMsg && <div style={{ marginTop: '12px', background: '#EFF6FF', border: '1px solid #BFDBFE', color: '#1E40AF', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600 }}>{sendMsg}</div>}
         {summary && (
-          <div style={{ marginTop: '14px', background: '#F0FDF4', border: '1px solid #BBF7D0', color: '#065F46', padding: '12px 16px', borderRadius: '10px', fontSize: '13px', fontWeight: 600 }}>
+          <div style={{ marginTop: '10px', background: '#F0FDF4', border: '1px solid #BBF7D0', color: '#065F46', padding: '12px 16px', borderRadius: '10px', fontSize: '13px', fontWeight: 600 }}>
             {summary.trial + summary.purchase + summary.renewal === 0
               ? 'No events in this range.'
-              : `Exported ✅ — ${summary.trial} trial, ${summary.purchase} paid, ${summary.renewal} renewal.`}
+              : `CSV ✅ — ${summary.trial} trial, ${summary.purchase} paid, ${summary.renewal} renewal.`}
           </div>
         )}
       </div>
 
+      {/* Test connection */}
       <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '14px', padding: '20px' }}>
-        <div style={{ fontWeight: 700, fontSize: '14px', color: '#0F172A', marginBottom: '10px' }}>How to upload to Meta (once a day)</div>
-        <ol style={{ margin: 0, paddingLeft: '18px', color: '#475569', fontSize: '13px', lineHeight: 1.7 }}>
-          <li>Meta <strong>Events Manager</strong> → open your dataset (ID <code>1080439971325299</code>).</li>
-          <li><strong>Add events → Upload events → Upload from file</strong>, choose this CSV.</li>
-          <li>Map the columns (email, phone, event name, event time, value, currency). Meta hashes the email/phone for you.</li>
-          <li>Review &amp; upload. The <code>event_id</code> column lets Meta ignore duplicates if ranges overlap.</li>
-        </ol>
+        <div style={{ fontWeight: 700, fontSize: '14px', color: '#0F172A', marginBottom: '4px' }}>🧪 Test the connection</div>
+        <p style={{ fontSize: '12px', color: '#64748B', margin: '0 0 10px' }}>
+          In Meta → Events Manager → your dataset → <strong>Test Events</strong> tab, copy the <code>TEST…</code> code and paste it here. This sends one harmless test event that appears there without touching real data.
+        </p>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <input value={testCode} onChange={e => setTestCode(e.target.value)} placeholder="e.g. TEST12345"
+            style={{ ...inp, minWidth: '200px' }} />
+          <button onClick={sendTest}
+            style={{ background: '#0D1B2A', color: '#E8C97A', border: 'none', borderRadius: '10px', padding: '10px 18px', fontSize: '13px', fontWeight: 700, cursor: 'pointer' }}>
+            Send test event
+          </button>
+        </div>
+        {testMsg && <div style={{ marginTop: '10px', fontSize: '13px', fontWeight: 600, color: testMsg.startsWith('✅') ? '#059669' : testMsg === 'Sending…' ? '#64748B' : '#DC2626' }}>{testMsg}</div>}
+      </div>
+
+      {/* Setup note */}
+      <div style={{ background: '#FFFBEB', border: '1px solid #FDE68A', borderRadius: '14px', padding: '16px 20px', fontSize: '13px', color: '#92400E', lineHeight: 1.7 }}>
+        <strong>One-time setup:</strong> add your Meta access token in Vercel as an env var named <code>META_CONVERSIONS_TOKEN</code>, then redeploy. Nothing sends to Meta until that token is set. Events go to dataset <code>1080439971325299</code> via the Conversions API (v25.0), deduped by <code>event_id</code>. Trial → <code>StartTrial</code>, first payment → <code>Purchase</code> (with value), later payments → <code>Renewal</code> (with value).
       </div>
     </div>
   )
