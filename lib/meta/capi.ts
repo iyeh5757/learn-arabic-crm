@@ -61,10 +61,14 @@ export async function sendCapiEvents(
 
   // Only events with at least one match key…
   const usable = events.filter(e => e.email || (e.phone && normPhone(e.phone)))
-  // …and Meta only accepts events from the last 7 days (older ones are rejected).
+  // …and within Meta's accepted window. Default 90 days (allowed once "historical
+  // data" is enabled on the dataset); override via META_CAPI_MAX_AGE_DAYS.
+  const maxAgeDays = Number(process.env.META_CAPI_MAX_AGE_DAYS) || 90
   const now = Math.floor(Date.now() / 1000)
-  const minTime = now - 7 * 24 * 3600 + 120
-  const fresh = usable.filter(e => e.event_time >= minTime && e.event_time <= now + 120)
+  const minTime = now - maxAgeDays * 24 * 3600 + 120
+  const fresh = usable
+    .filter(e => e.event_time >= minTime && e.event_time <= now + 120)
+    .sort((a, b) => b.event_time - a.event_time)   // newest first — protects recent events if an old batch is rejected
   const skippedOld = usable.length - fresh.length
   if (fresh.length === 0) return { ok: true, sent: 0, skippedOld }
 
