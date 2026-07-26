@@ -40,7 +40,7 @@ export default function MetaExportPage() {
         body: JSON.stringify({ from: new Date(from).toISOString(), to: new Date(to).toISOString() }),
       })
       const d = await res.json()
-      const oldNote = d.skippedOld ? ` (${d.skippedOld} skipped — older than 90 days, which Meta won't accept)` : ''
+      const oldNote = d.skippedOld ? ` (${d.skippedOld} skipped — older than 7 days; the API can't accept those. Use the CSV + Meta's Import events for older ones.)` : ''
       setSendMsg(res.ok ? `✅ Sent ${d.sent} of ${d.collected} events to Meta${oldNote}.` : `⚠️ ${d.error ?? 'Failed'}${oldNote}`)
     } catch (e: any) { setSendMsg(`⚠️ ${e?.message ?? 'Failed'}`) }
     setSending(false)
@@ -162,7 +162,7 @@ export default function MetaExportPage() {
             {busy ? 'Generating…' : '⬇ CSV'}
           </button>
         </div>
-        <p style={{ fontSize: '12px', color: '#94A3B8', margin: '12px 0 0' }}>Default = last 24 hours. Sending is automatic daily; use “Send to Meta now” to push a range on demand. <strong>Meta accepts events up to 90 days old</strong> (with historical data enabled on the dataset); older than that can&apos;t be back-filled. The daily job keeps everything current going forward.</p>
+        <p style={{ fontSize: '12px', color: '#94A3B8', margin: '12px 0 0' }}>Default = last 24 hours. Sending is automatic daily; use “Send to Meta now” to push a range on demand. <strong>The API only accepts events from the last 7 days</strong> (Meta&apos;s hard limit). For older conversions (up to 90 days), download the <strong>CSV</strong> and use Meta&apos;s <strong>Import events</strong> upload. The daily job keeps everything current going forward.</p>
 
         {error && <div style={{ marginTop: '12px', background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626', padding: '10px 14px', borderRadius: '8px', fontSize: '13px' }}>{error}</div>}
         {sendMsg && <div style={{ marginTop: '12px', background: '#EFF6FF', border: '1px solid #BFDBFE', color: '#1E40AF', padding: '10px 14px', borderRadius: '8px', fontSize: '13px', fontWeight: 600 }}>{sendMsg}</div>}

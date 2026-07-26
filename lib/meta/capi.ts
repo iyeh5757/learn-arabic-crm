@@ -61,9 +61,10 @@ export async function sendCapiEvents(
 
   // Only events with at least one match key…
   const usable = events.filter(e => e.email || (e.phone && normPhone(e.phone)))
-  // …and within Meta's accepted window. Default 90 days (allowed once "historical
-  // data" is enabled on the dataset); override via META_CAPI_MAX_AGE_DAYS.
-  const maxAgeDays = Number(process.env.META_CAPI_MAX_AGE_DAYS) || 90
+  // …and within Meta's accepted window. The Conversions API HARD-limits event_time
+  // to the last 7 days (the 90-day "historical" allowance is only for Meta's manual
+  // Import-events upload, not this API). Override via META_CAPI_MAX_AGE_DAYS.
+  const maxAgeDays = Number(process.env.META_CAPI_MAX_AGE_DAYS) || 7
   const now = Math.floor(Date.now() / 1000)
   const minTime = now - maxAgeDays * 24 * 3600 + 120
   const fresh = usable
