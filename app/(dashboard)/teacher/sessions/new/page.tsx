@@ -48,7 +48,8 @@ export default function TeacherNewSessionPage() {
       ...form, teacher_id: teacherId,
       duration: Number(form.duration),
       student_rating: form.student_rating ? Number(form.student_rating) : null,
-      trial_status: form.session_type === 'trial' ? (form.trial_status || 'pending') : null,
+      // Trial outcome is automatic: the DB marks it converted when the student pays
+      trial_status: form.session_type === 'trial' ? 'pending' : null,
       session_time: form.session_time || null,
       feedback: form.feedback || null,
       notes: form.notes || null,
@@ -114,12 +115,10 @@ export default function TeacherNewSessionPage() {
               </select>
             </div>
             {form.session_type === 'trial' && (
-              <div><label style={lbl}>Trial Outcome</label>
-                <select style={inp} value={form.trial_status} onChange={e => setForm(f => ({...f, trial_status: e.target.value}))}>
-                  <option value="pending">Pending</option>
-                  <option value="converted">✅ Converted</option>
-                  <option value="lost">❌ Lost</option>
-                </select>
+              <div style={{ display: 'flex', alignItems: 'flex-end' }}>
+                <p style={{ fontSize: '12px', color: '#6B7280', background: '#F9FAFB', border: '1px solid #E5E7EB', borderRadius: '8px', padding: '9px 12px', margin: 0 }}>
+                  ℹ️ Trial outcome is set automatically — it becomes <strong>Converted</strong> when the student pays.
+                </p>
               </div>
             )}
             <div><label style={lbl}>Student Rating</label>

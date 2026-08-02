@@ -33,7 +33,7 @@ export default function TeacherSessionEditPage() {
       homework: form.homework,
       feedback: form.feedback || null,
       student_rating: form.student_rating ? Number(form.student_rating) : null,
-      trial_status: form.session_type === 'trial' ? (form.trial_status || 'pending') : null,
+      // Trial outcome is not editable by teachers — it's driven by payment
       notes: form.notes || null,
     }).eq('id', id)
     if (err) { setError(err.message); setSaving(false); return }
@@ -84,12 +84,11 @@ export default function TeacherSessionEditPage() {
               </select>
             </div>
             {form.session_type === 'trial' && (
-              <div><label style={lbl}>Trial Outcome</label>
-                <select style={inp} value={form.trial_status ?? 'pending'} onChange={e => setForm((f: any) => ({...f, trial_status: e.target.value}))}>
-                  <option value="pending">Pending</option>
-                  <option value="converted">✅ Converted</option>
-                  <option value="lost">❌ Lost</option>
-                </select>
+              <div>
+                <label style={lbl}>Trial Outcome (automatic)</label>
+                <div style={{ ...inp, background: '#F9FAFB', color: '#6B7280', display: 'flex', alignItems: 'center' }}>
+                  {form.trial_status === 'converted' ? '✅ Converted' : form.trial_status === 'lost' ? '❌ Lost' : '⏳ Pending'} — set by payment
+                </div>
               </div>
             )}
             <div><label style={lbl}>Rating</label>
