@@ -35,6 +35,7 @@ export default async function SupervisorRemindersPage() {
       .select('id, name, phone, email, country, currency, total_paid_classes, consumed_classes, remaining_classes, assigned_teacher:teachers(profile:profiles!teachers_user_id_fkey(name))')
       .in('id', studentIds)
       .neq('student_status', 'inactive')
+      .eq('payment_status', 'paid')       // renewals are for paying customers only
       .order('remaining_classes', { ascending: true }),
     supabase.from('students')
       .select('id, name, phone, assigned_teacher:teachers(profile:profiles!teachers_user_id_fkey(name))')
@@ -122,15 +123,16 @@ export default async function SupervisorRemindersPage() {
         ))}
       </div>
 
-      {/* Pending Payments */}
-      {(pendingPayments ?? []).length > 0 && (
-        <div style={cardStyle}>
-          <div style={hdrStyle('#7C3AED')}>
-            <span style={{ color: '#fff', fontWeight: '700', fontSize: '15px' }}>💳 Pending Payments ({(pendingPayments ?? []).length})</span>
+      {/* Never-paid students live on their own page */}
+      <Link href="/supervisor/reminders/unpaid" style={{ textDecoration: 'none' }}>
+        <div style={{ background: '#F5F3FF', border: '2px solid #DDD6FE', borderRadius: '14px', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
+          <div>
+            <span style={{ color: '#5B21B6', fontWeight: 700, fontSize: '15px' }}>💳 First-Payment Follow-ups ({(pendingPayments ?? []).length})</span>
+            <p style={{ color: '#7C3AED', fontSize: '12px', margin: '4px 0 0' }}>Customers who haven&apos;t made their first payment — tracked separately from renewals</p>
           </div>
-          <StudentTable students={pendingPayments ?? []} cols={['Student', 'Phone', 'Teacher', 'Status', 'Currency', 'Actions']} />
+          <span style={{ color: '#5B21B6', fontWeight: 700, fontSize: '14px' }}>Open →</span>
         </div>
-      )}
+      </Link>
 
       {/* Out of classes */}
       {outOfClasses.length > 0 && (

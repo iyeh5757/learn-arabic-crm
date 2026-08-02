@@ -7,10 +7,13 @@ export default async function AdminRemindersPage() {
   const supabase = createClient()
   const today = new Date().toISOString().split('T')[0]
 
+  // Renewal reminders are only for customers who already paid — students who
+  // never made their first payment live on the separate "Unpaid" page.
   const { data: lowStudents } = await supabase
     .from('students')
     .select('id, name, phone, email, country, currency, total_paid_classes, consumed_classes, reminder_date, payment_method, notes, assigned_teacher:teachers(profile:profiles!teachers_user_id_fkey(name)), added_by_sales:profiles!students_added_by_sales_id_fkey(name)')
     .neq('student_status', 'inactive')
+    .eq('payment_status', 'paid')
     .order('consumed_classes', { ascending: false })
 
   const { data: pendingPayments } = await supabase
@@ -114,46 +117,16 @@ export default async function AdminRemindersPage() {
         </div>
       )}
 
-      {/* Pending Payments */}
-      {(pendingPayments ?? []).length > 0 && (
-        <div style={{ background: '#fff', border: '2px solid #DDD6FE', borderRadius: '16px', overflow: 'hidden' }}>
-          <div style={{ background: '#7C3AED', padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <span style={{ color: '#fff', fontWeight: '700', fontSize: '15px' }}>💳 Pending Payments ({(pendingPayments ?? []).length})</span>
-            <span style={{ color: 'rgba(255,255,255,0.7)', fontSize: '12px' }}>Students who haven't paid yet</span>
+      {/* Never-paid students live on their own page */}
+      <Link href="/admin/reminders/unpaid" style={{ textDecoration: 'none' }}>
+        <div style={{ background: '#F5F3FF', border: '2px solid #DDD6FE', borderRadius: '14px', padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}>
+          <div>
+            <span style={{ color: '#5B21B6', fontWeight: 700, fontSize: '15px' }}>💳 First-Payment Follow-ups ({(pendingPayments ?? []).length})</span>
+            <p style={{ color: '#7C3AED', fontSize: '12px', margin: '4px 0 0' }}>Customers who haven&apos;t made their first payment — tracked separately from renewals</p>
           </div>
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr style={{ background: '#F9FAFB' }}>
-                  {['Student', 'Status', 'Teacher', 'Sales Agent', 'Phone', 'Country', 'Currency'].map(h => (
-                    <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontSize: '11px', fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {(pendingPayments ?? []).map((s: any) => (
-                  <tr key={s.id} style={{ borderBottom: '1px solid #F3F4F6' }}>
-                    <td style={{ padding: '13px 14px' }}>
-                      <p style={{ fontWeight: '600', color: '#111827', margin: 0, fontSize: '14px' }}>{s.name}</p>
-                      {s.email && <p style={{ color: '#9CA3AF', fontSize: '11px', margin: '2px 0 0' }}>{s.email}</p>}
-                    </td>
-                    <td style={{ padding: '13px 14px' }}>
-                      <span style={{ background: s.student_status === 'trial' ? '#FFF7ED' : '#F5F3FF', color: s.student_status === 'trial' ? '#C2410C' : '#7C3AED', padding: '3px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '600', textTransform: 'capitalize' }}>
-                        {s.student_status}
-                      </span>
-                    </td>
-                    <td style={{ padding: '13px 14px', fontSize: '13px', color: '#374151' }}>{(s.assigned_teacher as any)?.profile?.name ?? '—'}</td>
-                    <td style={{ padding: '13px 14px', fontSize: '13px', color: '#374151' }}>{(s.added_by_sales as any)?.name ?? '—'}</td>
-                    <td style={{ padding: '13px 14px', fontSize: '13px', color: '#374151' }}>{s.phone ?? '—'}</td>
-                    <td style={{ padding: '13px 14px', fontSize: '13px', color: '#374151' }}>{s.country ?? '—'}</td>
-                    <td style={{ padding: '13px 14px', fontSize: '13px', color: '#374151' }}>{s.currency}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <span style={{ color: '#5B21B6', fontWeight: 700, fontSize: '14px' }}>Open →</span>
         </div>
-      )}
+      </Link>
 
             {/* Out of classes */}
       {outOfClasses.length > 0 && (
