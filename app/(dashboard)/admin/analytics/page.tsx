@@ -23,9 +23,11 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
     { data: teachers },
     { data: commissions },
   ] = await Promise.all([
-    supabase.from('students').select('id, name, country, currency, payment_method, student_status, added_by_sales_id, assigned_teacher_id, total_paid_classes, consumed_classes, created_at'),
+    supabase.from('students').select('id, name, country, currency, payment_method, student_status, payment_status, added_by_sales_id, assigned_teacher_id, total_paid_classes, consumed_classes, created_at'),
     supabase.from('payments').select('id, amount, currency, payment_method, status, student_id, created_at, is_renewal, number_of_classes'),
-    supabase.from('sessions').select('id, teacher_id, student_id, duration, status, created_at'),
+    // NOTE: sessions has no `status` column (that select used to fail and left
+    // every session metric empty) — the real columns are session_type etc.
+    supabase.from('sessions').select('id, teacher_id, student_id, duration, session_type, attendance_status, created_at'),
     supabase.from('teachers').select('id, user_id, rate_per_session_usd, profile:profiles!teachers_user_id_fkey(name)'),
     supabase.from('commissions').select('id, sales_user_id, amount, currency, status, created_at'),
   ])
@@ -84,7 +86,12 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
   const activeStudents   = allStudents.filter(s => s.student_status === 'active').length
   const trialStudents    = allStudents.filter(s => s.student_status === 'trial').length
   const inactiveStudents = allStudents.filter(s => s.student_status === 'inactive').length
-  const conversionRate   = allStudents.length > 0 ? Math.round((activeStudents / allStudents.length) * 100) : 0
+  // Conversion = students who ever PAID ÷ all students (every student starts as
+  // a trial). Includes legacy students marked paid whose payments predate the
+  // payments table. Status flags alone are manually managed and overstated this.
+  const paidIdSet = new Set(allPaidPayments.map(p => p.student_id))
+  const paidStudentsCount = allStudents.filter(s => paidIdSet.has(s.id) || s.payment_status === 'paid').length
+  const conversionRate = allStudents.length > 0 ? Math.round((paidStudentsCount / allStudents.length) * 100) : 0
 
   // ── Renewals vs new ─────────────────────────────────────────────────────
   const renewalCount = paidPayments.filter(p => p.is_renewal).length
@@ -145,13 +152,16 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
   })
   const topTeachersByHours = Object.values(teacherMap).sort((a, b) => b.hours - a.hours).slice(0, 8)
 
-  // Teacher trial conversion (all-time)
+  // Teacher trial conversion (all-time): trials taught vs students of theirs
+  // who went on to PAY (was broken before: filtered a non-existent `status`
+  // column, so trials always showed 0, and "converted" used the manual
+  // student_status flag instead of actual payments).
   const trialSessionsByTeacher: Record<string, number> = {}
   const convertedByTeacher: Record<string, number> = {}
-  allSessions.filter(s => s.status === 'trial').forEach(s => {
+  allSessions.filter(s => s.session_type === 'trial').forEach(s => {
     trialSessionsByTeacher[s.teacher_id] = (trialSessionsByTeacher[s.teacher_id] ?? 0) + 1
   })
-  allStudents.filter(s => s.student_status === 'active' && s.assigned_teacher_id).forEach(s => {
+  allStudents.filter(s => s.assigned_teacher_id && (paidIdSet.has(s.id) || s.payment_status === 'paid')).forEach(s => {
     convertedByTeacher[s.assigned_teacher_id!] = (convertedByTeacher[s.assigned_teacher_id!] ?? 0) + 1
   })
   const teacherConversionData = Object.entries(teacherMap).map(([id, t]) => ({
@@ -162,7 +172,7 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
 
   // ── AI Suggestions ──────────────────────────────────────────────────────
   const suggestions: { emoji: string; title: string; body: string; color: string }[] = []
-  if (conversionRate < 50) suggestions.push({ emoji: '🎯', title: 'Low Trial Conversion Rate', body: `Only ${conversionRate}% of students converted from trial to active. Review teacher performance on trial sessions and consider a follow-up process within 24 hours of each trial.`, color: '#DC2626' })
+  if (conversionRate < 50) suggestions.push({ emoji: '🎯', title: 'Low Trial Conversion Rate', body: `Only ${conversionRate}% of students have gone from trial to paying. Review teacher performance on trial sessions and consider a follow-up process within 24 hours of each trial.`, color: '#DC2626' })
   if (trialStudents > activeStudents * 0.3) suggestions.push({ emoji: '📞', title: 'High Trial Backlog', body: `You have ${trialStudents} students still in trial status. Assign a sales follow-up task to convert these — each unconverted trial is lost revenue.`, color: '#D97706' })
   if (inactiveStudents > activeStudents * 0.2) suggestions.push({ emoji: '🔄', title: 'Re-engagement Opportunity', body: `${inactiveStudents} students are inactive. A win-back campaign with a discounted renewal package could recover a portion of this segment.`, color: '#7C3AED' })
   if (renewalCount > 0 && paidPayments.length > 0 && renewalCount / paidPayments.length < 0.4) suggestions.push({ emoji: '💡', title: 'Improve Renewal Rate', body: `Only ${Math.round((renewalCount / paidPayments.length) * 100)}% of paid payments are renewals. Consider automated reminders 5 days before a student runs out of classes.`, color: '#2563EB' })
@@ -250,7 +260,7 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
           { label: 'Active',          value: activeStudents,         color: '#059669', bg: '#ECFDF5', emoji: '✅', note: 'all-time' },
           { label: 'Trials',          value: trialStudents,          color: '#D97706', bg: '#FFFBEB', emoji: '🎯', note: 'all-time' },
           { label: 'Inactive',        value: inactiveStudents,       color: '#6B7280', bg: '#F3F4F6', emoji: '💤', note: 'all-time' },
-          { label: 'Trial → Active',  value: `${conversionRate}%`,   color: conversionRate >= 60 ? '#059669' : '#DC2626', bg: conversionRate >= 60 ? '#ECFDF5' : '#FEF2F2', emoji: '🔄', note: 'all-time' },
+          { label: 'Trial → Paid',    value: `${conversionRate}%`,   color: conversionRate >= 60 ? '#059669' : '#DC2626', bg: conversionRate >= 60 ? '#ECFDF5' : '#FEF2F2', emoji: '🔄', note: 'all-time' },
           { label: 'Paid Payments',   value: paidPayments.length,    color: '#2563EB', bg: '#EFF6FF', emoji: '💳', note: periodLabel },
           { label: 'Renewals',        value: renewalCount,           color: '#7C3AED', bg: '#F5F3FF', emoji: '🔁', note: periodLabel },
           { label: 'Avg Classes/Pay', value: avgClasses,             color: '#0891B2', bg: '#ECFEFF', emoji: '📦', note: periodLabel },
@@ -421,7 +431,7 @@ export default async function AdminAnalyticsPage({ searchParams }: { searchParam
         </div>
 
         <div style={card}>
-          <div style={cardH('#0D1B2A', '#E8C97A')}>🎯 Teacher Trial Conversion (All Time)</div>
+          <div style={cardH('#0D1B2A', '#E8C97A')}>🎯 Teacher Trial Conversion (All Time) — trials taught vs their students who paid</div>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
               <thead><tr>{['Teacher','Trials','Converted','Rate'].map(h => <th key={h} style={thCell}>{h}</th>)}</tr></thead>

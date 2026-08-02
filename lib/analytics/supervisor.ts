@@ -102,6 +102,11 @@ export function computeAnalytics(input: AnalyticsInput, filters: AnalyticsFilter
   for (const p of allPaid) paidCount.set(p.student_id, (paidCount.get(p.student_id) ?? 0) + 1)
   const paidStudentIds    = new Set(Array.from(paidCount.entries()).filter(([, c]) => c >= 1).map(([id]) => id))
   const renewedStudentIds = new Set(Array.from(paidCount.entries()).filter(([, c]) => c >= 2).map(([id]) => id))
+  // Converted = ever paid. Legacy students whose payments predate the payments
+  // table are marked payment_status='paid' with no payment rows — count them too,
+  // otherwise conversion is understated.
+  const convertedIds = new Set<string>(paidStudentIds)
+  for (const s of students) if (s.payment_status === 'paid') convertedIds.add(s.id)
 
   const studentById = new Map(students.map(s => [s.id, s]))
   const revenueByStudent = new Map<string, number>()
@@ -113,8 +118,8 @@ export function computeAnalytics(input: AnalyticsInput, filters: AnalyticsFilter
     const total = sList.length                                                   // all students (every one did a trial)
     const active = sList.filter(s => s.student_status === 'active').length
     const inactive = sList.filter(s => s.student_status === 'inactive').length
-    const converted = sList.filter(s => paidStudentIds.has(s.id)).length         // paid at least once
-    const payers = converted
+    const converted = sList.filter(s => convertedIds.has(s.id)).length           // ever paid (incl. legacy)
+    const payers = sList.filter(s => paidStudentIds.has(s.id)).length            // has tracked payment rows (renewal denominator)
     const renewed = sList.filter(s => renewedStudentIds.has(s.id)).length        // paid again after first plan
     const revenue = sList.reduce((sum, s) => sum + (revenueByStudent.get(s.id) ?? 0), 0)
     return {

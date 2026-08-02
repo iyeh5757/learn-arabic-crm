@@ -55,11 +55,11 @@ export default async function SupervisorOwnAnalysisPage({ searchParams }: { sear
 
       <Filters supervisors={supervisors} teachers={teachers} months={months} hideSupervisor />
 
-      <MetricsTable title="🔍 My Team (total)" rows={supervisorRows} level="supervisor" variant="performance" />
-      <MetricsTable title="👩‍🏫 By Teacher" rows={teacherMetrics} level="teacher" variant="performance" />
+      <MetricsTable title="🔍 My Team (total)" rows={supervisorRows} level="supervisor" />
+      <MetricsTable title="👩‍🏫 By Teacher" rows={teacherMetrics} level="teacher" />
 
       <div style={{ fontSize: '11px', color: '#94A3B8' }}>
-        Active Students / Inactive = current counts. Trial conversion = students who have paid ÷ all students. Renewal rate = students who paid again after their first plan (2+ payments) ÷ students who have paid. Lifetime figures.
+        Students = everyone in scope (each started as a trial). Paid (Conv.) = students who ever paid (including old students whose payments predate the payment log) ÷ all students. Renewal = students who paid again (2+ recorded payments) ÷ students with recorded payments. Revenue in USD at live rates.
       </div>
     </div>
   )

@@ -56,16 +56,13 @@ export default async function SupervisorAnalysisPage({ searchParams }: { searchP
 
       <Filters supervisors={supervisors} teachers={teachers} months={months} />
 
-      <MetricsTable title="🔍 By Supervisor" rows={supervisorRows} level="supervisor" variant="performance" />
-      <MetricsTable title="👩‍🏫 By Teacher" rows={teacherMetrics} level="teacher" variant="performance" />
-
-      <MetricsTable title="💰 Revenue by Supervisor's Team" rows={supervisorRows} level="supervisor" variant="money" />
-      <MetricsTable title="💵 Revenue by Teacher" rows={teacherMetrics} level="teacher" variant="money" />
+      <MetricsTable title="🔍 By Supervisor" rows={supervisorRows} level="supervisor" />
+      <MetricsTable title="👩‍🏫 By Teacher" rows={teacherMetrics} level="teacher" />
 
       <Charts byCountry={byCountry} bySales={bySales} />
 
       <div style={{ fontSize: '11px', color: '#94A3B8' }}>
-        When a month is selected, all metrics are scoped to the cohort of students acquired in that month (joined that month). Trial conversion = students in cohort who paid ÷ all students in cohort. Renewal rate = students who paid again (2+ payments) ÷ students who paid. Revenue = payments from that month. Without a month filter, all figures are lifetime. Currency in USD at live rates.
+        Students = everyone in scope (each started as a trial). Paid (Conv.) = students who ever paid — including old students whose payments predate the payment log — ÷ all students. Renewal = students who paid again (2+ recorded payments) ÷ students with recorded payments. Revenue = paid payments in USD at live rates. When a month is selected, students are scoped to that month&apos;s cohort and revenue to that month&apos;s payments; otherwise figures are lifetime.
       </div>
     </div>
   )

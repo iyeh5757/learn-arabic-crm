@@ -1,7 +1,9 @@
 // Plain presentational table for supervisor/teacher metrics (server-rendered).
+// One unified table per level: funnel (students → paid → renewed) + revenue,
+// with a totals row at the bottom.
 import type { MetricRow } from '@/lib/analytics/supervisor'
 
-const th: React.CSSProperties = { padding: '10px 14px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em' }
+const th: React.CSSProperties = { padding: '10px 14px', textAlign: 'left', fontSize: '11px', fontWeight: 700, color: '#64748B', textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap' }
 const td: React.CSSProperties = { padding: '11px 14px', fontSize: '13px', color: '#374151', borderBottom: '1px solid #F3F4F6' }
 
 function pct(v: number) {
@@ -11,14 +13,25 @@ function pct(v: number) {
 }
 
 export default function MetricsTable({
-  title, rows, level, variant,
+  title, rows, level,
 }: {
   title: string
   rows: MetricRow[]
   level: 'supervisor' | 'teacher'
-  variant: 'performance' | 'money'
+  variant?: string   // legacy prop, ignored — the table is unified now
 }) {
   const isSup = level === 'supervisor'
+
+  // Totals across the rows shown (rates recomputed from the sums)
+  const sum = rows.reduce((a, r) => ({
+    trials: a.trials + r.trials, converted: a.converted + r.converted,
+    students: a.students + r.students, inactive: a.inactive + r.inactive,
+    payers: a.payers + r.payers, renewed: a.renewed + r.renewed,
+    revenue: a.revenue + r.revenue, teacherCount: a.teacherCount + (r.teacherCount ?? 0),
+  }), { trials: 0, converted: 0, students: 0, inactive: 0, payers: 0, renewed: 0, revenue: 0, teacherCount: 0 })
+  const totConv  = sum.trials ? Math.round((sum.converted / sum.trials) * 100) : 0
+  const totRenew = sum.payers ? Math.round((sum.renewed / sum.payers) * 100) : 0
+
   return (
     <div style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '14px', overflow: 'hidden' }}>
       <div style={{ padding: '14px 18px', background: '#0D1B2A' }}>
@@ -33,19 +46,12 @@ export default function MetricsTable({
               <tr style={{ background: '#F8FAFC' }}>
                 <th style={th}>{isSup ? 'Supervisor' : 'Teacher'}</th>
                 {isSup && <th style={th}>Teachers</th>}
-                {variant === 'performance' ? (
-                  <>
-                    <th style={th}>Trial Conversion</th>
-                    <th style={th}>Renewal Rate</th>
-                    <th style={th}>Active Students</th>
-                    <th style={th}>Inactive</th>
-                  </>
-                ) : (
-                  <>
-                    <th style={th}>Active Students</th>
-                    <th style={th}>Revenue (USD)</th>
-                  </>
-                )}
+                <th style={th}>Students</th>
+                <th style={th}>Active</th>
+                <th style={th}>Inactive</th>
+                <th style={th}>Paid (Conv.)</th>
+                <th style={th}>Renewal</th>
+                <th style={th}>Revenue (USD)</th>
               </tr>
             </thead>
             <tbody>
@@ -53,21 +59,26 @@ export default function MetricsTable({
                 <tr key={r.id}>
                   <td style={{ ...td, fontWeight: 600, color: '#111827' }}>{r.name}</td>
                   {isSup && <td style={td}>{r.teacherCount ?? 0}</td>}
-                  {variant === 'performance' ? (
-                    <>
-                      <td style={td}>{pct(r.convRate)} <span style={{ color: '#94A3B8', fontSize: '11px' }}>({r.converted}/{r.trials})</span></td>
-                      <td style={td}>{pct(r.renewalRate)} <span style={{ color: '#94A3B8', fontSize: '11px' }}>({r.renewed}/{r.payers})</span></td>
-                      <td style={{ ...td, fontWeight: 600 }}>{r.students}</td>
-                      <td style={{ ...td, color: r.inactive > 0 ? '#B45309' : '#374151' }}>{r.inactive}</td>
-                    </>
-                  ) : (
-                    <>
-                      <td style={td}>{r.students}</td>
-                      <td style={{ ...td, fontWeight: 700, color: '#059669' }}>${r.revenue.toLocaleString()}</td>
-                    </>
-                  )}
+                  <td style={td}>{r.trials}</td>
+                  <td style={{ ...td, fontWeight: 600, color: '#059669' }}>{r.students}</td>
+                  <td style={{ ...td, color: r.inactive > 0 ? '#B45309' : '#374151' }}>{r.inactive}</td>
+                  <td style={td}>{pct(r.convRate)} <span style={{ color: '#94A3B8', fontSize: '11px' }}>({r.converted}/{r.trials})</span></td>
+                  <td style={td}>{pct(r.renewalRate)} <span style={{ color: '#94A3B8', fontSize: '11px' }}>({r.renewed}/{r.payers})</span></td>
+                  <td style={{ ...td, fontWeight: 700, color: '#059669' }}>${r.revenue.toLocaleString()}</td>
                 </tr>
               ))}
+              {rows.length > 1 && (
+                <tr style={{ background: '#F8FAFC' }}>
+                  <td style={{ ...td, fontWeight: 800, color: '#0F172A' }}>TOTAL</td>
+                  {isSup && <td style={{ ...td, fontWeight: 700 }}>{sum.teacherCount}</td>}
+                  <td style={{ ...td, fontWeight: 700 }}>{sum.trials}</td>
+                  <td style={{ ...td, fontWeight: 700, color: '#059669' }}>{sum.students}</td>
+                  <td style={{ ...td, fontWeight: 700, color: sum.inactive > 0 ? '#B45309' : '#374151' }}>{sum.inactive}</td>
+                  <td style={td}>{pct(totConv)} <span style={{ color: '#94A3B8', fontSize: '11px' }}>({sum.converted}/{sum.trials})</span></td>
+                  <td style={td}>{pct(totRenew)} <span style={{ color: '#94A3B8', fontSize: '11px' }}>({sum.renewed}/{sum.payers})</span></td>
+                  <td style={{ ...td, fontWeight: 800, color: '#059669' }}>${sum.revenue.toLocaleString()}</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
