@@ -23,6 +23,8 @@ const NAV: Record<string, { label: string; href: string; emoji: string }[]> = {
     { label: 'Reports',        href: '/admin/reports',      emoji: '📈' },
     { label: 'Analytics',      href: '/admin/analytics',    emoji: '🤖' },
     { label: 'Team Analysis',  href: '/admin/supervisor-analysis', emoji: '📊' },
+    { label: 'Sales Salary',   href: '/admin/team-performance', emoji: '💼' },
+    { label: 'Re-reach',       href: '/admin/rereach',      emoji: '🔁' },
     { label: 'Meta Export',    href: '/admin/meta-export',  emoji: '🎯' },
     { label: 'Calendar',       href: '/admin/calendar',     emoji: '📅' },
     { label: 'Upload Leads',   href: '/admin/leads/upload', emoji: '📤' },
