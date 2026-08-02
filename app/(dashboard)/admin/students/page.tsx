@@ -26,10 +26,11 @@ export default async function AdminStudentsPage({
   if (searchParams.teacher) query = query.eq('assigned_teacher_id', searchParams.teacher)
 
   const { data: rawStudents } = await query
-  const { data: teachers } = await supabase
+  const { data: teacherRows } = await supabase
     .from('teachers')
     .select('id, profile:profiles!teachers_user_id_fkey(name)')
     .eq('is_active', true)
+  const teachers = (teacherRows ?? []).sort((a: any, b: any) => ((a.profile as any)?.name ?? '').localeCompare((b.profile as any)?.name ?? ''))
 
   // Search filter in JS (ilike not supported on views in all Supabase versions)
   const search = searchParams.search?.toLowerCase().trim() ?? ''

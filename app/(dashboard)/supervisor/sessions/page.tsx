@@ -25,7 +25,7 @@ export default function SupervisorSessionsPage() {
         .select('id, profile:profiles!teachers_user_id_fkey(name)')
         .eq('supervisor_id', user.id)
         .eq('is_active', true)
-      setTeachers(data ?? [])
+      setTeachers((data ?? []).sort((a: any, b: any) => (a.profile?.name ?? '').localeCompare(b.profile?.name ?? '')))
     }
     loadTeachers()
   }, [])

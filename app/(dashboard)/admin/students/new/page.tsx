@@ -42,7 +42,7 @@ export default function NewStudentPage() {
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id ?? ''))
-    supabase.from('teachers').select('id, user_id, specialties, languages, profile:profiles!teachers_user_id_fkey(name)').eq('is_active', true).then(({ data }) => setTeachers(data ?? []))
+    supabase.from('teachers').select('id, user_id, specialties, languages, profile:profiles!teachers_user_id_fkey(name)').eq('is_active', true).then(({ data }) => setTeachers((data ?? []).sort((a: any, b: any) => (((a.profile as any)?.name) || '').localeCompare(((b.profile as any)?.name) || ''))))
     supabase.from('profiles').select('id, name').eq('role', 'sales').then(({ data }) => setSalesAgents(data ?? []))
   }, [])
 

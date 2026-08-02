@@ -19,7 +19,8 @@ export default function SessionsPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    supabase.from('teachers').select('id, profile:profiles!teachers_user_id_fkey(name)').eq('is_active', true).then(({ data }) => setTeachers(data ?? []))
+    supabase.from('teachers').select('id, profile:profiles!teachers_user_id_fkey(name)').eq('is_active', true)
+      .then(({ data }) => setTeachers((data ?? []).sort((a: any, b: any) => (a.profile?.name ?? '').localeCompare(b.profile?.name ?? ''))))
     supabase.from('students').select('id, name, assigned_teacher_id').order('name').then(({ data }) => setStudents(data ?? []))
   }, [])
 
@@ -45,6 +46,27 @@ export default function SessionsPage() {
     'no-show': { bg: '#FEF2F2', text: '#DC2626' },
     cancelled: { bg: '#F3F4F6', text: '#6B7280' },
     scheduled: { bg: '#FFFBEB', text: '#D97706' },
+  }
+
+  function downloadCsv() {
+    const esc = (v: any) => { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s }
+    const headers = ['Date', 'Time', 'Student', 'Teacher', 'Type', 'Duration (min)', 'Attendance', 'Trial Status', 'Rating', 'Homework', 'Feedback', 'Notes']
+    const lines = [headers.join(',')]
+    for (const s of sessions) {
+      lines.push([
+        s.session_date, s.session_time ? s.session_time.slice(0, 5) : '',
+        s.student?.name ?? '', s.teacher?.profile?.name ?? '',
+        s.session_type, s.duration, s.attendance_status, s.trial_status ?? '',
+        s.student_rating ?? '', s.homework ? 'yes' : 'no', s.feedback ?? '', s.notes ?? '',
+      ].map(esc).join(','))
+    }
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `sessions-${selectedMonth}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   const inp = { padding: '9px 14px', border: '1.5px solid #E5E7EB', borderRadius: '8px', fontSize: '14px', fontFamily: 'inherit', outline: 'none' }
@@ -77,6 +99,10 @@ export default function SessionsPage() {
               Clear ✕
             </button>
           )}
+          <button onClick={downloadCsv} disabled={sessions.length === 0}
+            style={{ background: '#F0FDF4', color: '#065F46', border: '1px solid #BBF7D0', padding: '9px 16px', borderRadius: '8px', fontSize: '13px', cursor: sessions.length === 0 ? 'not-allowed' : 'pointer', fontWeight: '600', opacity: sessions.length === 0 ? 0.6 : 1 }}>
+            ⬇ CSV
+          </button>
           <Link href="/admin/sessions/new" style={{ background: '#0D1B2A', color: '#E8C97A', padding: '10px 20px', borderRadius: '10px', textDecoration: 'none', fontWeight: '600', fontSize: '14px' }}>
             + Log Session
           </Link>

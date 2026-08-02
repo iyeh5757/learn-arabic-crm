@@ -32,7 +32,7 @@ export default function NewSessionPage() {
 
   useEffect(() => {
     supabase.from('students').select('id, name, total_paid_classes, consumed_classes, session_duration, student_status').eq('student_status', 'active').order('name').then(({ data }) => setStudents(data ?? []))
-    supabase.from('teachers').select('id, profile:profiles!teachers_user_id_fkey(name)').eq('is_active', true).then(({ data }) => setTeachers(data ?? []))
+    supabase.from('teachers').select('id, profile:profiles!teachers_user_id_fkey(name)').eq('is_active', true).then(({ data }) => setTeachers((data ?? []).sort((a: any, b: any) => (((a.profile as any)?.name) || '').localeCompare(((b.profile as any)?.name) || ''))))
   }, [])
 
   const selectedStudent = students.find(s => s.id === form.student_id)

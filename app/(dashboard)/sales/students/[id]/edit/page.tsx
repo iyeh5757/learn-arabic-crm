@@ -26,7 +26,7 @@ export default function SalesEditStudentPage() {
       supabase.from('teachers').select('id, specialties, languages, profile:profiles!teachers_user_id_fkey(name)').eq('is_active', true),
     ]).then(([{ data: student }, { data: t }]) => {
       if (student) setForm(student)
-      setTeachers(t ?? [])
+      setTeachers((t ?? []).sort((a: any, b: any) => (((a.profile as any)?.name) || '').localeCompare(((b.profile as any)?.name) || '')))
       setLoading(false)
     })
   }, [id])

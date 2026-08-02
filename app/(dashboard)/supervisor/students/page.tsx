@@ -19,7 +19,7 @@ export default async function SupervisorStudentsPage({
     .select('id, profile:profiles!teachers_user_id_fkey(name)')
     .eq('supervisor_id', user.id)
     .eq('is_active', true)
-  const teachers = teacherRows ?? []
+  const teachers = (teacherRows ?? []).sort((a: any, b: any) => ((a.profile as any)?.name ?? '').localeCompare((b.profile as any)?.name ?? ''))
   const teacherIds = teachers.map((t: any) => t.id)
 
   if (teacherIds.length === 0) {

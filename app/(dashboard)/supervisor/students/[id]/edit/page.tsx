@@ -29,7 +29,7 @@ export default function SupervisorEditStudentPage() {
         supabase.from('teachers').select('id, user_id, specialties, languages, profile:profiles!teachers_user_id_fkey(name)').eq('is_active', true).eq('supervisor_id', user.id),
       ])
       if (student) setForm(student)
-      setTeachers(t ?? [])
+      setTeachers((t ?? []).sort((a: any, b: any) => (((a.profile as any)?.name) || '').localeCompare(((b.profile as any)?.name) || '')))
       setLoading(false)
     }
     load()

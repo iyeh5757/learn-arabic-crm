@@ -63,7 +63,11 @@ function cairoToUtc(dateStr: string, timeStr: string): Date {
   return new Date(guess.getTime() - offset * 60000)
 }
 
-export default function CalendarClient({ sessionTypes, teachers, supervisors, students, canDelete = true, showSupervisorFilter = true }: Props) {
+export default function CalendarClient({ sessionTypes, teachers: teachersProp, supervisors: supervisorsProp, students: studentsProp, canDelete = true, showSupervisorFilter = true }: Props) {
+  // Alphabetical everywhere (filters, booking modal, edit panel)
+  const teachers    = useMemo(() => [...teachersProp].sort((a, b) => a.name.localeCompare(b.name)), [teachersProp])
+  const supervisors = useMemo(() => [...supervisorsProp].sort((a, b) => a.name.localeCompare(b.name)), [supervisorsProp])
+  const students    = useMemo(() => [...studentsProp].sort((a, b) => a.name.localeCompare(b.name)), [studentsProp])
   const calRef = useRef<any>(null)
   const [filterTeacher, setFilterTeacher]       = useState('')
   const [filterSupervisor, setFilterSupervisor] = useState('')

@@ -24,7 +24,7 @@ export default function EditSessionPage() {
     ]).then(([{ data: session }, { data: s }, { data: t }]) => {
       if (session) setForm(session)
       setStudents(s ?? [])
-      setTeachers(t ?? [])
+      setTeachers((t ?? []).sort((a: any, b: any) => (((a.profile as any)?.name) || '').localeCompare(((b.profile as any)?.name) || '')))
       setLoading(false)
     })
   }, [id])

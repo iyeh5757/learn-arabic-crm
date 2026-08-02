@@ -29,7 +29,7 @@ export default function EditStudentPage() {
       supabase.from('profiles').select('id, name').eq('role', 'sales'),
     ]).then(([{ data: student }, { data: t }, { data: s }]) => {
       if (student) setForm(student)
-      setTeachers(t ?? [])
+      setTeachers((t ?? []).sort((a: any, b: any) => (((a.profile as any)?.name) || '').localeCompare(((b.profile as any)?.name) || '')))
       setSalesAgents(s ?? [])
       setLoading(false)
     })
