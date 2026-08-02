@@ -27,6 +27,7 @@ export default function EditUserPage() {
     commission_amount: '',
     commission_currency: 'USD',
     supervisor_id: '',
+    salary_method: '', salary_phone: '', salary_link: '',
   })
 
   useEffect(() => {
@@ -36,7 +37,7 @@ export default function EditUserPage() {
       supabase.from('sales_config').select('*').eq('sales_user_id', id).single(),
       supabase.from('profiles').select('id, name').eq('role', 'supervisor').eq('is_active', true),
     ]).then(([{ data: p }, { data: t }, { data: s }, { data: sup }]) => {
-      if (p) { setProfile(p); setForm(f => ({ ...f, name: p.name, is_active: p.is_active })) }
+      if (p) { setProfile(p); setForm(f => ({ ...f, name: p.name, is_active: p.is_active, salary_method: p.salary_method ?? '', salary_phone: p.salary_phone ?? '', salary_link: p.salary_link ?? '' })) }
       if (t) { setTeacher(t); setForm(f => ({ ...f, rate_per_session_usd: t.rate_per_session_usd, languages: t.languages ?? [], specialties: t.specialties ?? [], supervisor_id: t.supervisor_id ?? '' })) }
       if (s) setForm(f => ({ ...f, commission_amount: s.commission_amount, commission_currency: s.commission_currency }))
       setSupervisors(sup ?? [])
@@ -52,7 +53,12 @@ export default function EditUserPage() {
     e.preventDefault()
     setSaving(true); setError(''); setSuccess('')
 
-    const { error: profileErr } = await supabase.from('profiles').update({ name: form.name, is_active: form.is_active }).eq('id', id)
+    const { error: profileErr } = await supabase.from('profiles').update({
+      name: form.name, is_active: form.is_active,
+      salary_method: form.salary_method || null,
+      salary_phone: form.salary_phone || null,
+      salary_link: form.salary_link || null,
+    }).eq('id', id)
     if (profileErr) { setError(profileErr.message); setSaving(false); return }
 
     if (profile?.role === 'teacher' && teacher) {
@@ -183,6 +189,27 @@ export default function EditUserPage() {
             </div>
           </div>
         )}
+
+        <div style={card}>
+          <div style={cardH}>💵 Salary / Payout Details</div>
+          <div style={{ padding: '20px 22px', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+            <div>
+              <label style={lbl}>Salary Method</label>
+              <select style={inp} value={form.salary_method} onChange={e => setForm(f => ({ ...f, salary_method: e.target.value }))}>
+                <option value="">Not set</option>
+                {['Instapay', 'Vodafone Cash', 'Bank Transfer', 'PayPal', 'Western Union', 'Wise', 'Other'].map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+            <div>
+              <label style={lbl}>Transfer Phone Number</label>
+              <input style={inp} value={form.salary_phone} onChange={e => setForm(f => ({ ...f, salary_phone: e.target.value }))} placeholder="e.g. 01012345678" />
+            </div>
+            <div>
+              <label style={lbl}>Payment Link (optional)</label>
+              <input style={inp} value={form.salary_link} onChange={e => setForm(f => ({ ...f, salary_link: e.target.value }))} placeholder="e.g. ipn.eg/S/... or paypal.me/..." />
+            </div>
+          </div>
+        </div>
 
         {error && <div style={{ background: '#FEF2F2', border: '1px solid #FECACA', color: '#DC2626', padding: '12px 16px', borderRadius: '8px', fontSize: '14px', marginBottom: '16px' }}>{error}</div>}
         {success && <div style={{ background: '#ECFDF5', border: '1px solid #6EE7B7', color: '#065F46', padding: '12px 16px', borderRadius: '8px', fontSize: '14px', marginBottom: '16px' }}>✅ {success}</div>}
