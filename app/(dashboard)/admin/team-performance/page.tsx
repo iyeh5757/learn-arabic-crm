@@ -23,15 +23,18 @@ export default async function TeamPerformancePage({
     supabase.from('profiles').select('id, name').eq('role', 'sales').order('name'),
     supabase.from('sales_config').select('sales_user_id, commission_amount, commission_currency'),
     supabase.from('students').select('id, name, added_by_sales_id, country'),
-    supabase.from('payments').select('student_id, amount, currency, status, payment_date, created_at').eq('status', 'paid'),
+    supabase.from('payments').select('student_id, amount, currency, status, created_at').eq('status', 'paid'),
   ])
 
   const cfgByRep = new Map((cfg ?? []).map((c: any) => [c.sales_user_id, c]))
   const repName = new Map((reps ?? []).map((r: any) => [r.id, r.name]))
   const stById = new Map((students ?? []).map((s: any) => [s.id, s]))
 
-  // First paid payment per student (commission is one-time)
-  const payDate = (p: any) => p.payment_date ?? (p.created_at ?? '').slice(0, 10)
+  // First paid payment per student (commission is one-time).
+  // NOTE: the team fills `payment_date` with the NEXT renewal due date (~1
+  // month ahead), so it is NOT the day the customer paid — created_at (when
+  // the payment was recorded) is the real payment date.
+  const payDate = (p: any) => (p.created_at ?? '').slice(0, 10)
   const firstPay = new Map<string, any>()
   for (const p of (payments ?? []) as any[]) {
     const cur = firstPay.get(p.student_id)
