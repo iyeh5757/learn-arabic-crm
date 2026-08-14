@@ -20,12 +20,23 @@ export default async function MetaLogPage() {
   if (prof?.role !== 'admin') redirect('/dashboard')
 
   const since = new Date(Date.now() - 7 * 24 * 3600 * 1000).toISOString()
-  const [{ data: recent }, { data: window7 }] = await Promise.all([
+  const [{ data: recent }, { data: window7 }, { data: fxRates }, { data: fxLog }] = await Promise.all([
     supabase.from('meta_send_log')
       .select('id, event_name, entity_id, event_id, event_time, outcome, http_status, error, has_country, test_event, created_at')
       .order('created_at', { ascending: false }).limit(200),
     supabase.from('meta_send_log').select('outcome, created_at, has_country').gte('created_at', since),
+    supabase.from('fx_rates').select('currency, rate_per_usd, fetched_at').order('currency'),
+    supabase.from('fx_refresh_log').select('outcome, updated, error, created_at')
+      .order('created_at', { ascending: false }).limit(1),
   ])
+
+  // Newest rate timestamp drives the staleness warning. Stale rates silently
+  // mis-stamp every payment recorded after they go bad.
+  const newestFx = (fxRates ?? []).reduce<string | null>(
+    (a: string | null, r: any) => (!a || (r.fetched_at && r.fetched_at > a) ? r.fetched_at : a), null)
+  const fxHours = newestFx ? Math.round((Date.now() - new Date(newestFx).getTime()) / 3600000) : null
+  const fxStale = fxHours === null || fxHours > 48
+  const lastFx  = (fxLog ?? [])[0] as any
 
   const rows = recent ?? []
   const w = window7 ?? []
@@ -77,6 +88,40 @@ export default async function MetaLogPage() {
           </div>
         </div>
       )}
+
+      {/* FX rates — stale rates silently mis-stamp every new payment */}
+      <div style={{
+        background: fxStale ? '#FFFBEB' : '#fff',
+        border: `1px solid ${fxStale ? '#FDE68A' : '#E5E7EB'}`,
+        borderRadius: '14px', padding: '16px 20px',
+      }}>
+        <div style={{ fontWeight: 700, fontSize: '14px', color: fxStale ? '#92400E' : '#111827' }}>
+          {fxStale
+            ? `⚠️ FX rates are stale — ${fxHours === null ? 'never refreshed' : `last updated ${fxHours}h ago`}`
+            : `💱 FX rates fresh — updated ${fxHours}h ago`}
+        </div>
+        {fxStale && (
+          <div style={{ fontSize: '12px', color: '#92400E', marginTop: '4px' }}>
+            New payments are still being stamped, using the last known rate. Existing payments are unaffected.
+            {lastFx?.error ? ` Last error: ${lastFx.error}` : ''}
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: '18px', flexWrap: 'wrap', marginTop: '10px' }}>
+          {(fxRates ?? []).map((r: any) => (
+            <div key={r.currency} style={{ fontSize: '12px', color: '#475569' }}>
+              <strong>{r.currency}</strong> {Number(r.rate_per_usd)}
+              <span style={{ color: '#94A3B8', marginLeft: '6px' }}>
+                {r.fetched_at ? new Date(r.fetched_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) : '—'}
+              </span>
+            </div>
+          ))}
+        </div>
+        {lastFx && (
+          <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '8px' }}>
+            Last refresh attempt: {lastFx.outcome} ({lastFx.updated} updated) · {new Date(lastFx.created_at).toLocaleString('en-GB')}
+          </div>
+        )}
+      </div>
 
       {/* 7-day summary */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px' }}>
