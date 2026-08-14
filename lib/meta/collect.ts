@@ -13,7 +13,7 @@ export async function collectConversionEvents(
   supabase: any, fromISO: string, toISO: string
 ): Promise<CapiEvent[]> {
   const [{ data: students }, { data: payments }] = await Promise.all([
-    supabase.from('students').select('id, name, email, phone, created_at'),
+    supabase.from('students').select('id, name, email, phone, country, created_at'),
     supabase.from('payments').select('id, student_id, amount, currency, status, created_at').eq('status', 'paid').order('created_at'),
   ])
   const stById = new Map((students ?? []).map((s: any) => [s.id, s]))
@@ -30,6 +30,7 @@ export async function collectConversionEvents(
     events.push({
       event_name: 'StartTrial', event_time: unix(s.created_at), event_id: `${s.id}_trial`,
       email: s.email, phone: s.phone, first_name: nm.first, last_name: nm.last,
+      country: s.country, external_id: s.id,
     })
   }
 
@@ -48,6 +49,7 @@ export async function collectConversionEvents(
       event_time: unix(p.created_at),
       event_id: isRenewal ? `${p.student_id}_renewal_${p.id}` : `${p.student_id}_purchase`,
       email: s.email, phone: s.phone, first_name: nm.first, last_name: nm.last,
+      country: s.country, external_id: s.id,
       value: p.amount, currency: p.currency,
     })
   }

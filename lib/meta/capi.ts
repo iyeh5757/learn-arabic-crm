@@ -3,6 +3,7 @@
 // Meta's spec, and POSTs to the dataset's /events endpoint. Token comes from the
 // META_CONVERSIONS_TOKEN env var (never hardcoded).
 import crypto from 'crypto'
+import { toIso2 } from './countries'
 
 const GRAPH = 'https://graph.facebook.com'
 const API_VERSION = 'v25.0'
@@ -22,6 +23,8 @@ export type CapiEvent = {
   phone?: string | null
   first_name?: string | null
   last_name?: string | null
+  country?: string | null      // full country name; converted to ISO2 here
+  external_id?: string | null  // our student UUID (hashed before sending)
   value?: number | null
   currency?: string | null
 }
@@ -35,6 +38,12 @@ function buildUserData(e: CapiEvent) {
   const ln = e.last_name ? normName(e.last_name) : ''
   if (fn) ud.fn = [sha256(fn)]
   if (ln) ud.ln = [sha256(ln)]
+  // Country: Meta requires lowercase ISO-3166-1 alpha-2, hashed. Names we can't
+  // map (e.g. the selectable "Other") are omitted rather than sent wrong.
+  const cc = toIso2(e.country)
+  if (cc) ud.country = [sha256(cc)]
+  // Stable pseudonymous id — hashed, so no raw identifier leaves our system.
+  if (e.external_id) ud.external_id = [sha256(String(e.external_id))]
   return ud
 }
 
@@ -49,6 +58,31 @@ function buildEvent(e: CapiEvent) {
     event_id: e.event_id,
     custom_data: custom,
     user_data: buildUserData(e),
+  }
+}
+
+// Fire-and-forget audit trail. A logging failure must NEVER affect a send, so
+// every call is fully wrapped: errors are logged to the console and swallowed.
+async function logSend(rows: Record<string, any>[]): Promise<void> {
+  if (!rows.length) return
+  try {
+    const { createAdminClient } = await import('@/lib/supabase/admin')
+    await createAdminClient().from('meta_send_log').insert(rows)
+  } catch (e: any) {
+    console.error('[MetaLog] write failed (send unaffected):', e?.message)
+  }
+}
+
+// Shared row shape — never includes the token or unhashed PII.
+function logRow(e: CapiEvent, outcome: string, extra: Record<string, any> = {}) {
+  return {
+    event_name:  e.event_name,
+    entity_id:   e.external_id ?? null,
+    event_id:    e.event_id,
+    event_time:  new Date(e.event_time * 1000).toISOString(),
+    outcome,
+    has_country: !!toIso2(e.country),
+    ...extra,
   }
 }
 
@@ -71,6 +105,17 @@ export async function sendCapiEvents(
     .filter(e => e.event_time >= minTime && e.event_time <= now + 120)
     .sort((a, b) => b.event_time - a.event_time)   // newest first — protects recent events if an old batch is rejected
   const skippedOld = usable.length - fresh.length
+  const isTest = !!opts?.testEventCode
+
+  // Record what we're dropping instead of discarding it silently.
+  const freshSet = new Set(fresh)
+  const droppedOld = usable.filter(e => !freshSet.has(e))
+  const noMatchKey = events.filter(e => !usable.includes(e))
+  await logSend([
+    ...droppedOld.map(e => logRow(e, 'skipped_too_old', { test_event: isTest })),
+    ...noMatchKey.map(e => logRow(e, 'skipped_no_match_key', { test_event: isTest })),
+  ])
+
   if (fresh.length === 0) return { ok: true, sent: 0, skippedOld }
 
   const url = `${GRAPH}/${API_VERSION}/${DATASET_ID}/events?access_token=${encodeURIComponent(token)}`
@@ -86,12 +131,22 @@ export async function sendCapiEvents(
       if (!res.ok) {
         const err = json?.error
         const msg = err?.error_user_msg ?? err?.message ?? `HTTP ${res.status}`
+        await logSend(batch.map(e => logRow(e, 'failed', {
+          http_status: res.status, response: json, error: msg,
+          batch_size: batch.length, test_event: isTest,
+        })))
         return { ok: false, sent, skippedOld, error: msg, response: json }
       }
+      await logSend(batch.map(e => logRow(e, 'sent', {
+        http_status: res.status, response: json,
+        batch_size: batch.length, test_event: isTest,
+      })))
       sent += batch.length
     }
     return { ok: true, sent, skippedOld }
-  } catch (e: any) {
-    return { ok: false, sent, skippedOld, error: e?.message ?? 'Network error' }
+  } catch (err: any) {
+    const msg = err?.message ?? 'Network error'
+    await logSend(fresh.map(ev => logRow(ev, 'failed', { error: msg, test_event: isTest })))
+    return { ok: false, sent, skippedOld, error: msg }
   }
 }

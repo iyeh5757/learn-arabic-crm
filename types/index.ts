@@ -3,7 +3,7 @@
 // ============================================================
 
 export type Role = 'admin' | 'teacher' | 'supervisor' | 'sales' | 'accountant'
-export type Currency = 'USD' | 'GBP' | 'EUR' | 'AED'
+export type Currency = 'USD' | 'GBP' | 'EUR' | 'AED' | 'EGP'
 export type PaymentStatus = 'paid' | 'pending' | 'declined'
 export type StudentStatus = 'active' | 'inactive' | 'trial'
 export type AttendanceStatus = 'attended' | 'no-show' | 'cancelled' | 'scheduled'

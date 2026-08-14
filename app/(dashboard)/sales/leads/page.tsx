@@ -61,7 +61,26 @@ const TABS = [
     color: '#0F766E',
     bg: '#F0FDFA',
   },
+  {
+    // Safety net: catches any status no other tab claims, so a lead can never
+    // become invisible to the sales team. Purely defensive — adds no statuses.
+    key: 'other',
+    label: 'Other',
+    statuses: [] as string[],
+    catchAll: true,
+    color: '#475569',
+    bg: '#F1F5F9',
+  },
 ]
+
+// Every status explicitly claimed by a tab above.
+const CLAIMED_STATUSES = TABS.flatMap(t => t.statuses)
+// The catch-all tab matches anything no other tab claims.
+function matchesTab(tab: any, lead: any): boolean {
+  return tab.catchAll
+    ? !CLAIMED_STATUSES.includes(lead.status)
+    : tab.statuses.includes(lead.status)
+}
 
 const STATUS_LABEL: Record<string, string> = {
   new: 'New',
@@ -148,12 +167,12 @@ export default function SalesLeadsPage() {
 
   // ─── Tab counts ───────────────────────────────────────────────────────────
   const tabCounts = TABS.reduce((acc, tab) => {
-    acc[tab.key] = leads.filter(l => tab.statuses.includes(l.status)).length
+    acc[tab.key] = leads.filter(l => matchesTab(tab, l)).length
     return acc
   }, {} as Record<string, number>)
 
   const currentTab   = TABS.find(t => t.key === activeTab)!
-  const visibleLeads = leads.filter(l => currentTab.statuses.includes(l.status))
+  const visibleLeads = leads.filter(l => matchesTab(currentTab, l))
 
   // ─── Log contact submit ───────────────────────────────────────────────────
   async function submitLog(leadId: string) {
