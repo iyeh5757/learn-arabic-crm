@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 
 import { COUNTRIES, COUNTRY_CURRENCY } from '@/lib/countries'
+import { ACQUISITION_SOURCES } from '@/lib/acquisition'
 
 const PRESET_CLASSES = [4, 8, 12, 16, 20]
 
@@ -32,6 +33,7 @@ export default function NewStudentPage() {
     currency: 'USD', session_duration: 60,
     assigned_teacher_id: '', added_by_sales_id: '',
     student_status: 'trial', reminder_date: '', notes: '',
+    acquisition_source: '',
     payment_method: '', payment_status: 'pending',
     number_of_classes: 16,
     custom_classes: '',
@@ -75,6 +77,7 @@ export default function NewStudentPage() {
         payment_status: form.payment_status,
         reminder_date: form.reminder_date || null,
         notes: form.notes || null,
+        acquisition_source: form.acquisition_source || null,   // optional → NULL when blank
         total_paid_classes: 0,
         consumed_classes: 0,
       }
@@ -177,6 +180,12 @@ export default function NewStudentPage() {
               <select style={inp} value={form.country} onChange={e => handleCountry(e.target.value)}>
                 <option value="">Select country</option>
                 {COUNTRIES.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div><label style={lbl}>How did they find us?</label>
+              <select style={inp} value={form.acquisition_source} onChange={e => setForm(f => ({...f, acquisition_source: e.target.value}))}>
+                <option value="">— Not specified —</option>
+                {ACQUISITION_SOURCES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
               </select>
             </div>
           </div>
