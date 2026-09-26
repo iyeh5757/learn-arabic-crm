@@ -6,6 +6,7 @@ import listPlugin from '@fullcalendar/list'
 import interactionPlugin from '@fullcalendar/interaction'
 import luxon3Plugin from '@fullcalendar/luxon3'
 import { useState, useCallback, useRef, useMemo } from 'react'
+import { SESSION_DURATIONS } from '@/lib/duration'
 
 const inp: React.CSSProperties = {
   padding: '9px 11px', border: '1px solid #E2E8F0', borderRadius: '10px',
@@ -28,6 +29,7 @@ interface Props {
   students: Student[]
   canDelete?: boolean            // hard-delete allowed (admin only)
   showSupervisorFilter?: boolean // show the supervisor filter dropdown
+  durations?: { value: number; label: string }[] // lesson lengths offered when booking
 }
 
 const EMPTY_FORM = {
@@ -63,7 +65,7 @@ function cairoToUtc(dateStr: string, timeStr: string): Date {
   return new Date(guess.getTime() - offset * 60000)
 }
 
-export default function CalendarClient({ sessionTypes, teachers: teachersProp, supervisors: supervisorsProp, students: studentsProp, canDelete = true, showSupervisorFilter = true }: Props) {
+export default function CalendarClient({ sessionTypes, teachers: teachersProp, supervisors: supervisorsProp, students: studentsProp, canDelete = true, showSupervisorFilter = true, durations = SESSION_DURATIONS }: Props) {
   // Alphabetical everywhere (filters, booking modal, edit panel)
   const teachers    = useMemo(() => [...teachersProp].sort((a, b) => a.name.localeCompare(b.name)), [teachersProp])
   const supervisors = useMemo(() => [...supervisorsProp].sort((a, b) => a.name.localeCompare(b.name)), [supervisorsProp])
@@ -530,7 +532,7 @@ export default function CalendarClient({ sessionTypes, teachers: teachersProp, s
                     <label style={{ ...label, marginBottom: '4px' }}>Duration</label>
                     <select value={resched.duration} onChange={e => setResched(r => r && { ...r, duration: Number(e.target.value) })}
                       style={{ width: '100%', padding: '9px 10px', border: '1px solid #E2E8F0', borderRadius: '10px', fontSize: '13px', outline: 'none', background: '#fff' }}>
-                      {[30, 40, 60, 90, 120].map(d => <option key={d} value={d}>{d} minutes</option>)}
+                      {durations.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
                     </select>
                   </div>
 
@@ -703,7 +705,7 @@ export default function CalendarClient({ sessionTypes, teachers: teachersProp, s
                 <div>
                   <label style={label}>Duration</label>
                   <select style={inp} value={form.duration_minutes} onChange={e => setForm(f => ({ ...f, duration_minutes: Number(e.target.value) }))}>
-                    {[30, 40, 60, 90, 120].map(d => <option key={d} value={d}>{d} min</option>)}
+                    {durations.map(d => <option key={d.value} value={d.value}>{d.value} min</option>)}
                   </select>
                 </div>
               </div>

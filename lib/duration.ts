@@ -14,10 +14,15 @@ export const PLAN_DURATIONS = [
 
 export const SESSION_DURATIONS = [
   { value: 30,  label: '30 minutes' },
+  { value: 45,  label: '45 minutes' },
   { value: 60,  label: '60 minutes (1 hour)' },
   { value: 90,  label: '90 minutes (1.5 hours)' },
   { value: 120, label: '120 minutes (2 hours)' },
 ]
+
+// Sales book on the calendar but don't set lesson-length policy, so 45 minutes
+// is reserved for teachers, admins and supervisors.
+export const SALES_SESSION_DURATIONS = SESSION_DURATIONS.filter(d => d.value !== 45)
 
 /** Minutes -> "2h 30m" / "45m" / "3h" */
 export function fmtHours(minutes?: number | null): string {

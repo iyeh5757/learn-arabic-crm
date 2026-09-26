@@ -2,6 +2,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import CalendarClient from '../../admin/calendar/CalendarClient'
+import { SALES_SESSION_DURATIONS } from '@/lib/duration'
 
 export default async function SalesCalendarPage() {
   const supabase = createClient()
@@ -47,6 +48,7 @@ export default async function SalesCalendarPage() {
         supervisors={supervisors}
         students={(students ?? []).map((s: any) => ({ id: s.id, name: s.name, email: s.email ?? '', phone: s.phone ?? '' }))}
         canDelete={false}
+        durations={SALES_SESSION_DURATIONS}
       />
     </div>
   )
