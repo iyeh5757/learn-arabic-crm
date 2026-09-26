@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
+import PlanDurationCheck from '@/components/PlanDurationCheck'
 
 function NewPaymentPageInner() {
   const today = (() => {
@@ -138,6 +139,10 @@ function NewPaymentPageInner() {
             <div>
               <label style={lbl}>Number of Classes *</label>
               <input type="number" min={1} style={inp} value={form.number_of_classes} onChange={e => setForm(f => ({...f, number_of_classes: Number(e.target.value)}))} placeholder="Enter number of classes, e.g. 10" />
+            <PlanDurationCheck
+              sessionDuration={selectedStudent?.session_duration}
+              numberOfClasses={form.number_of_classes}
+              editHref={selectedStudent ? `/supervisor/students/${selectedStudent.id}/edit` : undefined} />
             </div>
             <div>
               <label style={lbl}>Amount *</label>

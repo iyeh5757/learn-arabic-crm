@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
+import PlanDurationCheck from '@/components/PlanDurationCheck'
 
 function SalesNewPaymentInner() {
   const today = (() => {
@@ -34,7 +35,7 @@ function SalesNewPaymentInner() {
     supabase.auth.getUser().then(async ({ data }) => {
       const uid = data.user?.id ?? ''
       setCurrentUserId(uid)
-      const { data: s } = await supabase.from('students').select('id, name, currency, total_paid_classes, consumed_classes, payment_method').eq('added_by_sales_id', uid).order('name')
+      const { data: s } = await supabase.from('students').select('id, name, currency, session_duration, total_paid_classes, consumed_classes, payment_method').eq('added_by_sales_id', uid).order('name')
       setStudents(s ?? [])
     })
   }, [])
@@ -85,6 +86,10 @@ function SalesNewPaymentInner() {
             </div>
             <div><label style={lbl}>Number of Classes</label>
               <input type="number" min={1} style={inp} value={form.number_of_classes} onChange={e=>setForm(f=>({...f,number_of_classes:Number(e.target.value)}))} placeholder="Enter number of classes, e.g. 10" />
+            <PlanDurationCheck
+              sessionDuration={selectedStudent?.session_duration}
+              numberOfClasses={form.number_of_classes}
+              editHref={selectedStudent ? `/sales/students/${selectedStudent.id}/edit` : undefined} />
             </div>
             <div><label style={lbl}>Amount</label>
               <div style={{ position:'relative' }}>
