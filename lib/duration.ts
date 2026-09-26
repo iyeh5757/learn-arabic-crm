@@ -7,6 +7,11 @@
 // SESSION_DURATIONS — how long an individual lesson actually RAN. A customer
 // on a 30-minute plan may occasionally take a 90-minute lesson; that simply
 // consumes 90 minutes of their balance.
+//
+// Do NOT prune values that look unused: 40 minutes is a live arrangement for
+// at least one ongoing customer. Removing a length from this list makes the
+// edit form unable to represent existing sessions of that length, which risks
+// silently rewriting their duration (and the student's balance) on save.
 export const PLAN_DURATIONS = [
   { value: 30, label: '30 minutes' },
   { value: 60, label: '1 hour' },
@@ -14,6 +19,7 @@ export const PLAN_DURATIONS = [
 
 export const SESSION_DURATIONS = [
   { value: 30,  label: '30 minutes' },
+  { value: 40,  label: '40 minutes' },
   { value: 45,  label: '45 minutes' },
   { value: 60,  label: '60 minutes (1 hour)' },
   { value: 90,  label: '90 minutes (1.5 hours)' },
