@@ -2,6 +2,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { fmtHours, fmtSessions } from '@/lib/duration'
 
 export default async function TeacherStudentsPage() {
   const supabase = createClient()
@@ -51,7 +52,7 @@ export default async function TeacherStudentsPage() {
                 <tr><td colSpan={8} style={{ textAlign: 'center', padding: '48px', color: '#9CA3AF' }}>No students assigned yet</td></tr>
               )}
               {(students ?? []).map(s => {
-                const remaining = s.total_paid_classes - s.consumed_classes
+                const remaining = (s.total_paid_minutes ?? 0) - (s.consumed_minutes ?? 0)
                 const sc = statusColor[s.student_status] ?? { bg: '#F3F4F6', text: '#374151' }
                 return (
                   <tr key={s.id} style={{ borderBottom: '1px solid #F3F4F6' }}>
@@ -65,11 +66,11 @@ export default async function TeacherStudentsPage() {
                     </td>
                     <td style={{ padding: '14px 16px', color: '#374151', fontSize: '13px' }}>{s.session_duration}min</td>
                     <td style={{ padding: '14px 16px', color: '#374151', fontSize: '13px', textAlign: 'center' }}>
-                      {s.consumed_classes} / {s.total_paid_classes}
+                      {fmtHours(s.consumed_minutes)} / {fmtHours(s.total_paid_minutes)}
                     </td>
                     <td style={{ padding: '14px 16px', textAlign: 'center' }}>
-                      <span style={{ fontWeight: '700', fontSize: '15px', color: remaining <= 0 ? '#DC2626' : remaining <= 2 ? '#D97706' : '#059669' }}>
-                        {remaining}
+                      <span style={{ fontWeight: '700', fontSize: '15px', color: remaining <= 0 ? '#DC2626' : remaining <= 2 * (Number(s.session_duration) || 60) ? '#D97706' : '#059669' }}>
+                        {fmtHours(remaining)}
                       </span>
                     </td>
                     <td style={{ padding: '14px 16px', color: '#6B7280', fontSize: '12px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

@@ -1,5 +1,6 @@
 // app/(dashboard)/supervisor/teachers/page.tsx
 import { createClient } from '@/lib/supabase/server'
+import { fmtHours, fmtSessions } from '@/lib/duration'
 
 export default async function SupervisorTeachersPage() {
   const supabase = createClient()
@@ -13,7 +14,7 @@ export default async function SupervisorTeachersPage() {
     .from('teachers')
     .select(`id, rate_per_session_usd, languages, specialties, is_active,
       profile:profiles!teachers_user_id_fkey(name, email),
-      students:students(id, name, student_status, total_paid_classes, consumed_classes),
+      students:students(id, name, student_status, total_paid_classes, consumed_classes, total_paid_minutes, consumed_minutes, session_duration),
       sessions:sessions(id, session_type, attendance_status, session_date, trial_status)`)
     .eq('is_active', true)
     .eq('supervisor_id', user.id)
@@ -31,7 +32,7 @@ export default async function SupervisorTeachersPage() {
         const monthSessions = (t.sessions ?? []).filter((s: any) => s.session_type === 'paid' && s.attendance_status === 'attended' && s.session_date >= monthStart)
         const trialsConverted = (t.sessions ?? []).filter((s: any) => s.trial_status === 'converted').length
         const trialsLost = (t.sessions ?? []).filter((s: any) => s.trial_status === 'lost').length
-        const needsRenewal = activeStudents.filter((s: any) => (s.total_paid_classes - s.consumed_classes) <= 2)
+        const needsRenewal = activeStudents.filter((s: any) => (((s.total_paid_minutes ?? 0) - (s.consumed_minutes ?? 0)) <= 2 * (Number(s.session_duration) || 60)))
 
         return (
           <div key={t.id} style={{ background: '#fff', border: '1px solid #E5E7EB', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
@@ -72,11 +73,11 @@ export default async function SupervisorTeachersPage() {
                 <p style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 10px 0' }}>Active Students</p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                   {activeStudents.map((s: any) => {
-                    const rem = s.total_paid_classes - s.consumed_classes
+                    const rem = (s.total_paid_minutes ?? 0) - (s.consumed_minutes ?? 0)
                     return (
-                      <div key={s.id} style={{ background: rem <= 2 ? '#FFFBEB' : '#F9FAFB', border: `1px solid ${rem <= 2 ? '#FCD34D' : '#E5E7EB'}`, borderRadius: '8px', padding: '6px 12px', fontSize: '13px' }}>
+                      <div key={s.id} style={{ background: rem <= 2 * (Number(s.session_duration) || 60) ? '#FFFBEB' : '#F9FAFB', border: `1px solid ${rem <= 2 * (Number(s.session_duration) || 60) ? '#FCD34D' : '#E5E7EB'}`, borderRadius: '8px', padding: '6px 12px', fontSize: '13px' }}>
                         <span style={{ fontWeight: '500', color: '#111827' }}>{s.name}</span>
-                        <span style={{ color: rem <= 2 ? '#D97706' : '#6B7280', marginLeft: '6px', fontSize: '12px' }}>{rem} left</span>
+                        <span style={{ color: rem <= 2 * (Number(s.session_duration) || 60) ? '#D97706' : '#6B7280', marginLeft: '6px', fontSize: '12px' }}>{fmtHours(rem)} left</span>
                       </div>
                     )
                   })}

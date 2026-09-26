@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 import PlanDurationCheck from '@/components/PlanDurationCheck'
+import { fmtHours } from '@/lib/duration'
 
 function NewPaymentPageInner() {
   const today = (() => {
@@ -41,7 +42,7 @@ function NewPaymentPageInner() {
 
       const { data } = await supabase
         .from('students')
-        .select('id, name, currency, session_duration, total_paid_classes, consumed_classes, payment_method')
+        .select('id, name, currency, session_duration, total_paid_classes, consumed_classes, total_paid_minutes, consumed_minutes, payment_method')
         .in('assigned_teacher_id', teacherIds)
         .order('name')
 
@@ -123,8 +124,8 @@ function NewPaymentPageInner() {
               <select style={inp} value={form.student_id} onChange={e => handleStudentChange(e.target.value)} required>
                 <option value="">Select student</option>
                 {students.map(s => {
-                  const rem = s.total_paid_classes - s.consumed_classes
-                  return <option key={s.id} value={s.id}>{s.name} — {s.currency} — {rem} classes remaining</option>
+                  const rem = (s.total_paid_minutes ?? 0) - (s.consumed_minutes ?? 0)
+                  return <option key={s.id} value={s.id}>{s.name} — {s.currency} — {fmtHours(rem)} remaining</option>
                 })}
               </select>
               {selectedStudent && (

@@ -2,6 +2,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { fmtHours } from '@/lib/duration'
 
 export default async function SalesStudentsPage() {
   const supabase = createClient()
@@ -52,7 +53,7 @@ export default async function SalesStudentsPage() {
                     <td style={{ padding: '14px 16px', color: '#374151', fontSize: '13px' }}>{(s.assigned_teacher as any)?.profile?.name ?? '—'}</td>
                     <td style={{ padding: '14px 16px', color: '#374151', fontSize: '13px' }}>{s.country ?? '—'}</td>
                     <td style={{ padding: '14px 16px' }}><span style={{ background: '#F3F4F6', color: '#374151', padding: '2px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: '600' }}>{s.currency}</span></td>
-                    <td style={{ padding: '14px 16px', textAlign: 'center', color: '#374151', fontSize: '13px' }}>{s.consumed_classes} / {s.total_paid_classes}</td>
+                    <td style={{ padding: '14px 16px', textAlign: 'center', color: '#374151', fontSize: '13px' }}>{fmtHours(s.consumed_minutes)} / {fmtHours(s.total_paid_minutes)}</td>
                     <td style={{ padding: '14px 16px', textAlign: 'center' }}>
                       <span style={{ fontWeight: '700', fontSize: '14px', color: rem <= 0 ? '#DC2626' : rem <= 2 ? '#D97706' : '#059669' }}>{rem}</span>
                     </td>

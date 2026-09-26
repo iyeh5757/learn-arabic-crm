@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 import PlanDurationCheck from '@/components/PlanDurationCheck'
+import { fmtHours } from '@/lib/duration'
 
 function NewPaymentForm() {
   const today = (() => {
@@ -33,7 +34,7 @@ function NewPaymentForm() {
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id ?? ''))
-    supabase.from('students').select('id, name, currency, session_duration, total_paid_classes, consumed_classes, payment_method').order('name').then(({ data }) => {
+    supabase.from('students').select('id, name, currency, session_duration, total_paid_classes, consumed_classes, total_paid_minutes, consumed_minutes, payment_method').order('name').then(({ data }) => {
       setStudents(data ?? [])
       if (preselectedStudent) {
         const s = data?.find((x: any) => x.id === preselectedStudent)
@@ -89,8 +90,8 @@ function NewPaymentForm() {
               }} required>
                 <option value="">Select student</option>
                 {students.map(s => {
-                  const rem = s.total_paid_classes - s.consumed_classes
-                  return <option key={s.id} value={s.id}>{s.name} — {s.currency} — {rem} classes remaining</option>
+                  const rem = (s.total_paid_minutes ?? 0) - (s.consumed_minutes ?? 0)
+                  return <option key={s.id} value={s.id}>{s.name} — {s.currency} — {fmtHours(rem)} remaining</option>
                 })}
               </select>
               {selectedStudent && (

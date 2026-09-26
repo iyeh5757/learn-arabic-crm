@@ -2,6 +2,7 @@
 // components/dashboard/RenewalAlert.tsx
 import { AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
+import { fmtHours } from '@/lib/duration'
 
 export default function RenewalAlert({ students }: { students: any[] }) {
   return (
@@ -23,8 +24,8 @@ export default function RenewalAlert({ students }: { students: any[] }) {
               <p className="text-sm font-semibold text-gray-900">{s.name}</p>
               <p className="text-xs text-gray-500">{s.currency}</p>
             </div>
-            <span className={`badge ${s.remaining_classes <= 0 ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
-              {s.remaining_classes} left
+            <span className={`badge ${(s.remaining_minutes ?? 0) <= 0 ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+              {fmtHours(s.remaining_minutes)} left
             </span>
           </div>
         ))}

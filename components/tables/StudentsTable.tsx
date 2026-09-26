@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { Eye, Edit, AlertTriangle } from 'lucide-react'
 import type { Role } from '@/types'
-import { fmtHours } from '@/lib/duration'
+import { fmtHours, fmtSessions } from '@/lib/duration'
 
 const STATUS_BADGE = {
   active:   'bg-green-100 text-green-800',
@@ -83,7 +83,7 @@ export default function StudentsTable({ students, role }: { students: any[]; rol
                     </span>
                     {s.session_duration > 0 && remainMin > 0 && (
                       <div className="text-[11px] text-gray-400">
-                        ≈ {Math.floor(remainMin / s.session_duration)} × {s.session_duration}m
+                        {fmtSessions(remainMin, s.session_duration)} × {s.session_duration}m sessions
                       </div>
                     )}
                   </td>

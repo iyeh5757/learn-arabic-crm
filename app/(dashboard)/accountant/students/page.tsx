@@ -1,6 +1,7 @@
 // app/(dashboard)/accountant/students/page.tsx
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
+import { fmtHours, fmtSessions } from '@/lib/duration'
 
 export default async function AccountantStudentsPage() {
   const supabase = createClient()
@@ -29,8 +30,8 @@ export default async function AccountantStudentsPage() {
             </thead>
             <tbody>
               {(students ?? []).map((s: any) => {
-                const rem = s.total_paid_classes - s.consumed_classes
-                const needsRenewal = rem <= 2 && s.student_status !== 'inactive'
+                const rem = (s.total_paid_minutes ?? 0) - (s.consumed_minutes ?? 0)
+                const needsRenewal = rem <= 2 * (Number(s.session_duration) || 60) && s.student_status !== 'inactive'
                 return (
                   <tr key={s.id} style={{ borderBottom: '1px solid #F3F4F6', background: needsRenewal ? '#FFFBEB' : 'transparent' }}>
                     <td style={{ padding: '14px 16px' }}>
@@ -47,9 +48,9 @@ export default async function AccountantStudentsPage() {
                     </td>
                     <td style={{ padding: '14px 16px', color: '#374151', fontSize: '13px' }}>{(s.assigned_teacher as any)?.profile?.name ?? '—'}</td>
                     <td style={{ padding: '14px 16px' }}><span style={{ background: '#F3F4F6', color: '#374151', padding: '2px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: '600' }}>{s.currency}</span></td>
-                    <td style={{ padding: '14px 16px', textAlign: 'center', color: '#374151', fontSize: '13px' }}>{s.consumed_classes} / {s.total_paid_classes}</td>
+                    <td style={{ padding: '14px 16px', textAlign: 'center', color: '#374151', fontSize: '13px' }}>{fmtHours(s.consumed_minutes)} / {fmtHours(s.total_paid_minutes)}</td>
                     <td style={{ padding: '14px 16px', textAlign: 'center' }}>
-                      <span style={{ fontWeight: '700', fontSize: '14px', color: rem <= 0 ? '#DC2626' : rem <= 2 ? '#D97706' : '#059669' }}>{rem}</span>
+                      <span style={{ fontWeight: '700', fontSize: '14px', color: rem <= 0 ? '#DC2626' : rem <= 2 * (Number(s.session_duration) || 60) ? '#D97706' : '#059669' }}>{fmtHours(rem)}</span>
                     </td>
                     <td style={{ padding: '14px 16px' }}>
                       <span style={{ background: s.payment_status === 'paid' ? '#ECFDF5' : s.payment_status === 'declined' ? '#FEF2F2' : '#FFFBEB', color: s.payment_status === 'paid' ? '#059669' : s.payment_status === 'declined' ? '#DC2626' : '#D97706', padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>{s.payment_status}</span>

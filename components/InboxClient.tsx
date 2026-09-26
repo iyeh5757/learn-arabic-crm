@@ -5,6 +5,7 @@
 // business number via Evolution. Polls every few seconds for new messages.
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { fmtBalance } from '@/lib/duration'
 
 type Conv = {
   id: string; wa_jid: string; name: string | null; wa_name: string | null; phone: string | null; is_group: boolean
@@ -14,7 +15,7 @@ type Conv = {
 }
 type Msg = { id: string; direction: string; body: string | null; media_type: string | null; sender_name: string | null; created_at: string }
 type Rep = { id: string; name: string }
-type StudentCtx = { id: string; name: string; student_status: string | null; total_paid_classes: number | null; consumed_classes: number | null; recontact_date: string | null }
+type StudentCtx = { id: string; name: string; student_status: string | null; total_paid_classes: number | null; consumed_classes: number | null; total_paid_minutes: number | null; consumed_minutes: number | null; session_duration: number | null; recontact_date: string | null }
 type QuickReply = { id: string; label: string; text: string }
 
 export default function InboxClient({ currentUserId, reps, countries, rolePrefix }: { currentUserId: string; reps: Rep[]; countries: string[]; rolePrefix: string }) {
@@ -68,7 +69,7 @@ export default function InboxClient({ currentUserId, reps, countries, rolePrefix
   useEffect(() => {
     const sid = selected?.student_id
     if (!sid) { setStudent(null); return }
-    supabase.from('students').select('id, name, student_status, total_paid_classes, consumed_classes, recontact_date').eq('id', sid).single()
+    supabase.from('students').select('id, name, student_status, total_paid_classes, consumed_classes, total_paid_minutes, consumed_minutes, session_duration, recontact_date').eq('id', sid).single()
       .then(({ data }) => setStudent(data as StudentCtx ?? null))
   }, [selected?.student_id])
 
@@ -294,7 +295,7 @@ export default function InboxClient({ currentUserId, reps, countries, rolePrefix
                   👤 {student.name} ↗
                 </a>
                 <span style={{ fontSize: '11px', color: '#475569' }}>
-                  {Math.max(0, (student.total_paid_classes ?? 0) - (student.consumed_classes ?? 0))} classes left
+                  {fmtBalance(Math.max(0, (student.total_paid_minutes ?? 0) - (student.consumed_minutes ?? 0)), student.session_duration)} left
                 </span>
                 <label style={{ fontSize: '11px', color: '#64748B', display: 'flex', alignItems: 'center', gap: '5px' }}>
                   Status

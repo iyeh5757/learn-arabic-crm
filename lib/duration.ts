@@ -35,3 +35,30 @@ export function fmtHours(minutes?: number | null): string {
 export function toHours(minutes?: number | null): number {
   return Math.round(((Number(minutes) || 0) / 60) * 100) / 100
 }
+
+/**
+ * Remaining time expressed as a count of the customer's OWN sessions.
+ * 30 minutes left on a 1-hour plan is half a lesson, so it reads 0.5 — never
+ * floored to 0, which would hide credit the customer has actually paid for.
+ * Plans are 30/60 and lessons are 30/60/90/120, so in practice this is always
+ * a whole number or a clean half.
+ */
+export function toSessions(minutes?: number | null, planMinutes?: number | null): number | null {
+  const m = Number(minutes), p = Number(planMinutes)
+  if (!Number.isFinite(m) || !Number.isFinite(p) || p <= 0) return null
+  return Math.round((m / p) * 100) / 100
+}
+
+/** "2.5" | "0.5" | "3"  (trailing .0 dropped) */
+export function fmtSessions(minutes?: number | null, planMinutes?: number | null): string | null {
+  const v = toSessions(minutes, planMinutes)
+  if (v === null) return null
+  return Number.isInteger(v) ? `${v}` : String(v).replace(/0+$/, '').replace(/\.$/, '')
+}
+
+/** "2h 30m · 2.5 sessions" — the standard balance label */
+export function fmtBalance(minutes?: number | null, planMinutes?: number | null): string {
+  const t = fmtHours(minutes)
+  const s = fmtSessions(minutes, planMinutes)
+  return s === null ? t : `${t} · ${s} ${s === '1' ? 'session' : 'sessions'}`
+}

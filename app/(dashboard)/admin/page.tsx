@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import StatCard from '@/components/dashboard/StatCard'
 import Link from 'next/link'
+import { fmtHours, fmtSessions } from '@/lib/duration'
 
 
 function getMonthRange(monthParam?: string | null) {
@@ -50,7 +51,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
       .select('teacher_id, duration, session_type, student_id, student:students(student_status, payment_status), teacher:teachers(id, rate_per_session_usd, profile:profiles!teachers_user_id_fkey(name))')
       .in('session_type', ['paid', 'trial']).in('attendance_status', ['attended', 'no-show'])
       .gte('session_date', start).lte('session_date', end),
-    supabase.from('students').select('id, name, total_paid_classes, consumed_classes').neq('student_status', 'inactive'),
+    supabase.from('students').select('id, name, total_paid_classes, consumed_classes, total_paid_minutes, consumed_minutes, session_duration').neq('student_status', 'inactive'),
     supabase.from('students').select('id, name').eq('reminder_date', new Date().toISOString().split('T')[0]),
     supabase.from('commissions').select('amount, currency, status, sales_user:profiles!commissions_sales_user_id_fkey(name)').gte('created_at', start).lte('created_at', end),
   ])
@@ -108,7 +109,8 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
   }, {})
   const commissionRows = Object.values(commissionsByAgent).sort((a: any, b: any) => b.total - a.total)
 
-  const needsRenewal = (lowStudents ?? []).filter(s => (s.total_paid_classes - s.consumed_classes) <= 2)
+  const remMin = (s: any) => (s.total_paid_minutes ?? 0) - (s.consumed_minutes ?? 0)
+  const needsRenewal = (lowStudents ?? []).filter(s => remMin(s) <= 2 * (Number(s.session_duration) || 60))
   const activeCount  = (allStudents ?? []).filter(s => s.student_status === 'active').length
   const trialCount   = (allStudents ?? []).filter(s => s.student_status === 'trial').length
 
@@ -196,11 +198,11 @@ export default async function AdminDashboard({ searchParams }: { searchParams?: 
             ? <p style={{ padding: '24px', color: '#9CA3AF', textAlign: 'center', margin: 0 }}>🎉 All students have classes</p>
             : <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
                 {needsRenewal.slice(0, 10).map(s => {
-                  const rem = s.total_paid_classes - s.consumed_classes
+                  const rem = (s.total_paid_minutes ?? 0) - (s.consumed_minutes ?? 0)
                   return (
                     <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 22px', borderBottom: '1px solid #F9FAFB' }}>
                       <Link href={`/admin/students/${s.id}/edit`} style={{ fontWeight: '600', color: '#111827', textDecoration: 'none', fontSize: '14px' }}>{s.name}</Link>
-                      <span style={{ fontWeight: '700', fontSize: '15px', color: rem <= 0 ? '#DC2626' : rem === 1 ? '#EA580C' : '#D97706' }}>{rem} left</span>
+                      <span style={{ fontWeight: '700', fontSize: '15px', color: rem <= 0 ? '#DC2626' : rem <= (Number(s.session_duration) || 60) ? '#EA580C' : '#D97706' }}>{fmtHours(rem)} left</span>
                     </div>
                   )
                 })}

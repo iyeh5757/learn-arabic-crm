@@ -1,18 +1,20 @@
 // app/(dashboard)/accountant/renewals/page.tsx
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
+import { fmtHours, fmtSessions } from '@/lib/duration'
 
 export default async function AccountantRenewalsPage() {
   const supabase = createClient()
 
   const { data: students } = await supabase
     .from('students')
-    .select('id, name, phone, email, country, currency, total_paid_classes, consumed_classes, student_status, payment_method, reminder_date, assigned_teacher:teachers(profile:profiles!teachers_user_id_fkey(name))')
+    .select('id, name, phone, email, country, currency, total_paid_classes, consumed_classes, total_paid_minutes, consumed_minutes, session_duration, student_status, payment_method, reminder_date, assigned_teacher:teachers(profile:profiles!teachers_user_id_fkey(name))')
     .neq('student_status', 'inactive')
-    .order('consumed_classes', { ascending: false })
+    .order('consumed_minutes', { ascending: false })
 
-  const needsRenewal = (students ?? []).filter(s => (s.total_paid_classes - s.consumed_classes) <= 2)
-  const urgent = needsRenewal.filter(s => (s.total_paid_classes - s.consumed_classes) <= 0)
+  const remMin = (s: any) => (s.total_paid_minutes ?? 0) - (s.consumed_minutes ?? 0)
+  const needsRenewal = (students ?? []).filter(s => remMin(s) <= 2 * (Number(s.session_duration) || 60))
+  const urgent = needsRenewal.filter(s => remMin(s) <= 0)
   const soon = needsRenewal.filter(s => (s.total_paid_classes - s.consumed_classes) > 0)
 
   return (
@@ -91,7 +93,7 @@ function StudentRenewalTable({ students }: { students: any[] }) {
                 <td style={{ padding: '14px 16px', color: '#374151', fontSize: '13px' }}>{s.country ?? '—'}</td>
                 <td style={{ padding: '14px 16px' }}><span style={{ background: '#F3F4F6', color: '#374151', padding: '2px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: '600' }}>{s.currency}</span></td>
                 <td style={{ padding: '14px 16px', textAlign: 'center' }}>
-                  <span style={{ fontWeight: '700', fontSize: '16px', color: rem <= 0 ? '#DC2626' : '#D97706' }}>{rem}</span>
+                  <span style={{ fontWeight: '700', fontSize: '16px', color: rem <= 0 ? '#DC2626' : '#D97706' }}>{fmtHours(rem)}</span>
                 </td>
                 <td style={{ padding: '14px 16px', color: '#6B7280', fontSize: '12px' }}>{s.phone ?? s.email ?? '—'}</td>
                 <td style={{ padding: '14px 16px' }}>

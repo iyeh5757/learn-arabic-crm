@@ -2,6 +2,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { fmtHours, fmtSessions } from '@/lib/duration'
 
 export default async function TeacherDashboard() {
   const supabase = createClient()
@@ -30,7 +31,7 @@ export default async function TeacherDashboard() {
     { data: allSessions },
     { data: recentSessions },
   ] = await Promise.all([
-    supabase.from('students').select('id, name, student_status, total_paid_classes, consumed_classes, session_duration').eq('assigned_teacher_id', teacher.id).order('name'),
+    supabase.from('students').select('id, name, student_status, total_paid_classes, consumed_classes, total_paid_minutes, consumed_minutes, session_duration').eq('assigned_teacher_id', teacher.id).order('name'),
     supabase.from('sessions').select('id, attendance_status, session_type, duration, session_date, trial_status, student:students(student_status, payment_status)').eq('teacher_id', teacher.id),
     supabase.from('sessions').select('*, student:students(name)').eq('teacher_id', teacher.id).order('session_date', { ascending: false }).limit(8),
   ])
@@ -105,11 +106,11 @@ export default async function TeacherDashboard() {
           </div>
           <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
             {(myStudents ?? []).slice(0, 8).map(s => {
-              const rem = s.total_paid_classes - s.consumed_classes
+              const rem = (s.total_paid_minutes ?? 0) - (s.consumed_minutes ?? 0)
               return (
                 <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 22px', borderBottom: '1px solid #F9FAFB' }}>
                   <span style={{ fontSize: '14px', fontWeight: '500', color: '#111827' }}>{s.name}</span>
-                  <span style={{ fontSize: '12px', fontWeight: '700', color: rem <= 2 ? '#D97706' : '#059669' }}>{rem} left</span>
+                  <span style={{ fontSize: '12px', fontWeight: '700', color: rem <= 2 * (Number(s.session_duration) || 60) ? '#D97706' : '#059669' }}>{fmtHours(rem)} left</span>
                 </div>
               )
             })}

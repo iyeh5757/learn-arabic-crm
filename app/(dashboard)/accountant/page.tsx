@@ -2,6 +2,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { fmtHours, fmtSessions } from '@/lib/duration'
 
 export default async function AccountantDashboard() {
   const supabase = createClient()
@@ -20,13 +21,14 @@ export default async function AccountantDashboard() {
     { data: reminders },
     { data: paidThisMonth },
   ] = await Promise.all([
-    supabase.from('students').select('id, name, total_paid_classes, consumed_classes, student_status, currency, phone, email, payment_method, reminder_date, assigned_teacher:teachers(profile:profiles!teachers_user_id_fkey(name))').neq('student_status', 'inactive').order('name'),
+    supabase.from('students').select('id, name, total_paid_classes, consumed_classes, total_paid_minutes, consumed_minutes, session_duration, student_status, currency, phone, email, payment_method, reminder_date, assigned_teacher:teachers(profile:profiles!teachers_user_id_fkey(name))').neq('student_status', 'inactive').order('name'),
     supabase.from('payments').select('*, student:students(name, currency, phone)').eq('status', 'pending').order('created_at', { ascending: false }),
     supabase.from('students').select('id, name, reminder_date, phone, email, notes').eq('reminder_date', today),
     supabase.from('payments').select('amount, currency').eq('status', 'paid').gte('payment_date', monthStart),
   ])
 
-  const needsRenewal = (allStudents ?? []).filter(s => (s.total_paid_classes - s.consumed_classes) <= 2)
+  const remMin = (s: any) => (s.total_paid_minutes ?? 0) - (s.consumed_minutes ?? 0)
+  const needsRenewal = (allStudents ?? []).filter(s => remMin(s) <= 2 * (Number(s.session_duration) || 60))
 
   // Revenue this month by currency
   const rev: Record<string, number> = {}
@@ -83,7 +85,7 @@ export default async function AccountantDashboard() {
             {needsRenewal.length === 0 ? (
               <p style={{ textAlign: 'center', color: '#9CA3AF', fontSize: '14px', padding: '32px' }}>🎉 All students have sufficient classes</p>
             ) : needsRenewal.map((s: any) => {
-              const rem = s.total_paid_classes - s.consumed_classes
+              const rem = (s.total_paid_minutes ?? 0) - (s.consumed_minutes ?? 0)
               return (
                 <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 22px', borderBottom: '1px solid #F9FAFB' }}>
                   <div>
@@ -93,7 +95,7 @@ export default async function AccountantDashboard() {
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '6px' }}>
                     <span style={{ background: rem <= 0 ? '#FEF2F2' : '#FFFBEB', color: rem <= 0 ? '#DC2626' : '#D97706', padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '700' }}>
-                      {rem} left
+                      {fmtHours(rem)} left
                     </span>
                     <Link href={`/accountant/payments/new?student=${s.id}`} style={{ background: '#0D1B2A', color: '#E8C97A', padding: '4px 10px', borderRadius: '6px', textDecoration: 'none', fontSize: '11px', fontWeight: '600' }}>
                       + Add Payment

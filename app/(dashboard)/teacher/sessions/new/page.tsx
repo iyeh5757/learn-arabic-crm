@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
-import { SESSION_DURATIONS } from '@/lib/duration'
+import { SESSION_DURATIONS, fmtHours, fmtBalance } from '@/lib/duration'
 
 export default function TeacherNewSessionPage() {
   const today = (() => {
@@ -32,14 +32,15 @@ export default function TeacherNewSessionPage() {
       const { data: teacher } = await supabase.from('teachers').select('id').eq('user_id', data.user?.id ?? '').single()
       if (teacher) {
         setTeacherId(teacher.id)
-        const { data: myStudents } = await supabase.from('students').select('id, name, total_paid_classes, consumed_classes, session_duration').eq('assigned_teacher_id', teacher.id).order('name')
+        const { data: myStudents } = await supabase.from('students').select('id, name, total_paid_classes, consumed_classes, total_paid_minutes, consumed_minutes, session_duration').eq('assigned_teacher_id', teacher.id).order('name')
         setStudents(myStudents ?? [])
       }
     })
   }, [])
 
   const selectedStudent = students.find(s => s.id === form.student_id)
-  const remaining = selectedStudent ? selectedStudent.total_paid_classes - selectedStudent.consumed_classes : null
+  // Remaining credit in MINUTES — the session about to be logged deducts its exact length
+  const remaining = selectedStudent ? (selectedStudent.total_paid_minutes ?? 0) - (selectedStudent.consumed_minutes ?? 0) : null
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -80,13 +81,13 @@ export default function TeacherNewSessionPage() {
               <select style={inp} value={form.student_id} onChange={e => setForm(f => ({...f, student_id: e.target.value}))} required>
                 <option value="">Select your student</option>
                 {students.map(s => {
-                  const rem = s.total_paid_classes - s.consumed_classes
-                  return <option key={s.id} value={s.id}>{s.name} ({rem} classes left)</option>
+                  const rem = (s.total_paid_minutes ?? 0) - (s.consumed_minutes ?? 0)
+                  return <option key={s.id} value={s.id}>{s.name} ({fmtHours(rem)} left)</option>
                 })}
               </select>
               {selectedStudent && (
-                <p style={{ fontSize: '12px', marginTop: '4px', color: remaining !== null && remaining <= 2 ? '#D97706' : '#059669', fontWeight: '500' }}>
-                  {remaining} classes remaining · {selectedStudent.session_duration}min sessions
+                <p style={{ fontSize: '12px', marginTop: '4px', color: remaining !== null && remaining <= 2 * (Number(selectedStudent.session_duration) || 60) ? '#D97706' : '#059669', fontWeight: '500' }}>
+                  {fmtBalance(remaining, selectedStudent.session_duration)} remaining · {selectedStudent.session_duration}min plan
                 </p>
               )}
             </div>
