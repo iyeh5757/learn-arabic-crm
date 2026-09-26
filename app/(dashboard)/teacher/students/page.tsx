@@ -19,7 +19,7 @@ export default async function TeacherStudentsPage() {
   // Note: deliberately NOT selecting email or phone
   const { data: students } = await supabase
     .from('students')
-    .select('id, name, country, student_status, total_paid_classes, consumed_classes, session_duration, currency, notes')
+    .select('id, name, country, student_status, total_paid_classes, consumed_classes, total_paid_minutes, consumed_minutes, session_duration, currency, notes')
     .eq('assigned_teacher_id', teacher.id)
     .order('name')
 

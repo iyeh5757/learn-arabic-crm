@@ -2,6 +2,7 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { MarkInactiveButton, ReactivateButton, FollowupsButton } from './RetentionActions'
+import { fmtHours } from '@/lib/duration'
 
 export default async function AdminRemindersPage() {
   const supabase = createClient()
@@ -11,7 +12,7 @@ export default async function AdminRemindersPage() {
   // never made their first payment live on the separate "Unpaid" page.
   const { data: lowStudents } = await supabase
     .from('students')
-    .select('id, name, phone, email, country, currency, total_paid_classes, consumed_classes, reminder_date, payment_method, notes, assigned_teacher:teachers(profile:profiles!teachers_user_id_fkey(name)), added_by_sales:profiles!students_added_by_sales_id_fkey(name)')
+    .select('id, name, phone, email, country, currency, total_paid_classes, consumed_classes, total_paid_minutes, consumed_minutes, session_duration, reminder_date, payment_method, notes, assigned_teacher:teachers(profile:profiles!teachers_user_id_fkey(name)), added_by_sales:profiles!students_added_by_sales_id_fkey(name)')
     .neq('student_status', 'inactive')
     .eq('payment_status', 'paid')
     .order('consumed_classes', { ascending: false })
@@ -34,14 +35,18 @@ export default async function AdminRemindersPage() {
     .eq('student_status', 'inactive')
     .order('recontact_date', { ascending: true, nullsFirst: false })
 
-  const outOfClasses = (lowStudents ?? []).filter(s => (s.total_paid_classes - s.consumed_classes) <= 0)
-  const oneLast = (lowStudents ?? []).filter(s => (s.total_paid_classes - s.consumed_classes) === 1)
-  const twoLeft = (lowStudents ?? []).filter(s => (s.total_paid_classes - s.consumed_classes) === 2)
+  // Buckets are measured in MINUTES against each student's own plan length,
+  // so "1 class left" still means one of THEIR classes (30 or 60 min).
+  const remMin = (s: any) => (s.total_paid_minutes ?? 0) - (s.consumed_minutes ?? 0)
+  const planOf = (s: any) => Number(s.session_duration) || 60
+  const outOfClasses = (lowStudents ?? []).filter(s => remMin(s) <= 0)
+  const oneLast = (lowStudents ?? []).filter(s => remMin(s) > 0 && remMin(s) <= planOf(s))
+  const twoLeft = (lowStudents ?? []).filter(s => remMin(s) > planOf(s) && remMin(s) <= 2 * planOf(s))
 
   const rowStyle = { borderBottom: '1px solid #F3F4F6' }
 
   function StudentRow({ s }: { s: any }) {
-    const rem = s.total_paid_classes - s.consumed_classes
+    const rem = (s.total_paid_minutes ?? 0) - (s.consumed_minutes ?? 0)
     return (
       <tr style={rowStyle}>
         <td style={{ padding: '14px 16px' }}>
@@ -52,7 +57,7 @@ export default async function AdminRemindersPage() {
         <td style={{ padding: '14px 16px', color: '#6B7280', fontSize: '13px' }}>{s.phone ?? '—'}</td>
         <td style={{ padding: '14px 16px' }}><span style={{ background: '#F3F4F6', color: '#374151', padding: '2px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: '600' }}>{s.currency}</span></td>
         <td style={{ padding: '14px 16px', textAlign: 'center' }}>
-          <span style={{ fontWeight: '700', fontSize: '16px', color: rem <= 0 ? '#DC2626' : rem === 1 ? '#EA580C' : '#D97706' }}>{rem}</span>
+          <span style={{ fontWeight: '700', fontSize: '16px', color: rem <= 0 ? '#DC2626' : rem <= (Number(s.session_duration)||60) ? '#EA580C' : '#D97706' }}>{fmtHours(rem)}</span>
         </td>
         <td style={{ padding: '14px 16px' }}>
           <div style={{ display: 'flex', gap: '8px' }}>
@@ -68,7 +73,7 @@ export default async function AdminRemindersPage() {
   const TableHeader = () => (
     <thead>
       <tr style={{ background: '#F9FAFB' }}>
-        {['Student', 'Teacher', 'Phone', 'Currency', 'Classes Left', 'Actions'].map(h => (
+        {['Student', 'Teacher', 'Phone', 'Currency', 'Time Left', 'Actions'].map(h => (
           <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: '11px', fontWeight: '600', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', borderBottom: '1px solid #E5E7EB', whiteSpace: 'nowrap' }}>{h}</th>
         ))}
       </tr>

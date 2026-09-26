@@ -10,7 +10,7 @@ export default async function SalesStudentsPage() {
 
   const { data: students } = await supabase
     .from('students')
-    .select('id, name, email, phone, country, currency, total_paid_classes, consumed_classes, student_status, payment_status, created_at, assigned_teacher:teachers(profile:profiles!teachers_user_id_fkey(name))')
+    .select('id, name, email, phone, country, currency, total_paid_classes, consumed_classes, total_paid_minutes, consumed_minutes, session_duration, student_status, payment_status, created_at, assigned_teacher:teachers(profile:profiles!teachers_user_id_fkey(name))')
     .eq('added_by_sales_id', user.id)
     .order('created_at', { ascending: false })
 

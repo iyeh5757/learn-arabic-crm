@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 
 import { COUNTRIES, COUNTRY_CURRENCY } from '@/lib/countries'
 import { ACQUISITION_SOURCES } from '@/lib/acquisition'
+import { PLAN_DURATIONS } from '@/lib/duration'
 
 const PRESET_CLASSES = [4, 8, 12, 16, 20]
 
@@ -203,11 +204,10 @@ export default function NewStudentPage() {
             </div>
             <div><label style={lbl}>Session Duration</label>
               <select style={inp} value={form.session_duration} onChange={e => setForm(f => ({...f, session_duration: Number(e.target.value)}))}>
-                <option value={30}>30 minutes</option>
-                <option value={40}>40 minutes</option>
-                <option value={60}>60 minutes (1 hour)</option>
-                <option value={90}>90 minutes (1.5 hours)</option>
-                <option value={120}>120 minutes (2 hours)</option>
+                {PLAN_DURATIONS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+                {![30,60].includes(Number(form.session_duration)) && (
+                  <option value={Number(form.session_duration)}>{form.session_duration} minutes (legacy — please update)</option>
+                )}
               </select>
             </div>
             <div><label style={lbl}>Student Status</label>

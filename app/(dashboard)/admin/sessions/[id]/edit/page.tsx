@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter, useParams } from 'next/navigation'
+import { SESSION_DURATIONS } from '@/lib/duration'
 
 export default function EditSessionPage() {
   const router = useRouter()
@@ -96,11 +97,7 @@ export default function EditSessionPage() {
             <div><label style={lbl}>Time</label><input type="time" style={inp} value={form.session_time ?? ''} onChange={e => setForm((f: any) => ({...f, session_time: e.target.value}))} /></div>
             <div><label style={lbl}>Duration</label>
               <select style={inp} value={form.duration} onChange={e => setForm((f: any) => ({...f, duration: Number(e.target.value)}))}>
-                <option value={30}>30 minutes</option>
-                <option value={40}>40 minutes</option>
-                <option value={60}>60 minutes (1 hour)</option>
-                <option value={90}>90 minutes (1.5 hours)</option>
-                <option value={120}>120 minutes (2 hours)</option>
+                {SESSION_DURATIONS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
               </select>
             </div>
             <div><label style={lbl}>Session Type</label>

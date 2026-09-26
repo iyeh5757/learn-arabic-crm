@@ -7,7 +7,7 @@ export default async function AccountantStudentsPage() {
 
   const { data: students } = await supabase
     .from('students')
-    .select('id, name, email, phone, country, currency, total_paid_classes, consumed_classes, student_status, payment_status, payment_method, reminder_date, assigned_teacher:teachers(profile:profiles!teachers_user_id_fkey(name))')
+    .select('id, name, email, phone, country, currency, total_paid_classes, consumed_classes, total_paid_minutes, consumed_minutes, session_duration, student_status, payment_status, payment_method, reminder_date, assigned_teacher:teachers(profile:profiles!teachers_user_id_fkey(name))')
     .order('name')
 
   return (

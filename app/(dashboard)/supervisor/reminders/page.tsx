@@ -2,6 +2,7 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { MarkInactiveButton, ReactivateButton, FollowupsButton } from '../../admin/reminders/RetentionActions'
+import { fmtHours } from '@/lib/duration'
 
 export default async function SupervisorRemindersPage() {
   const supabase = createClient()
@@ -32,11 +33,11 @@ export default async function SupervisorRemindersPage() {
   // Fetch reminders data filtered to supervisor's students
   const [{ data: lowStudents }, { data: todayReminders }, { data: pendingPayments }] = await Promise.all([
     supabase.from('students_with_remaining')
-      .select('id, name, phone, email, country, currency, total_paid_classes, consumed_classes, remaining_classes, assigned_teacher:teachers(profile:profiles!teachers_user_id_fkey(name))')
+      .select('id, name, phone, email, country, currency, total_paid_classes, consumed_classes, remaining_classes, total_paid_minutes, consumed_minutes, remaining_minutes, session_duration, assigned_teacher:teachers(profile:profiles!teachers_user_id_fkey(name))')
       .in('id', studentIds)
       .neq('student_status', 'inactive')
       .eq('payment_status', 'paid')       // renewals are for paying customers only
-      .order('remaining_classes', { ascending: true }),
+      .order('remaining_minutes', { ascending: true }),
     supabase.from('students')
       .select('id, name, phone, assigned_teacher:teachers(profile:profiles!teachers_user_id_fkey(name))')
       .in('id', studentIds)
@@ -56,9 +57,12 @@ export default async function SupervisorRemindersPage() {
     .eq('student_status', 'inactive')
     .order('recontact_date', { ascending: true, nullsFirst: false })
 
-  const outOfClasses = (lowStudents ?? []).filter(s => (s.remaining_classes ?? 0) <= 0)
-  const oneLast      = (lowStudents ?? []).filter(s => s.remaining_classes === 1)
-  const twoLeft      = (lowStudents ?? []).filter(s => s.remaining_classes === 2)
+  // Minutes-based buckets, relative to each student's own plan length
+  const remMin = (s: any) => s.remaining_minutes ?? 0
+  const planOf = (s: any) => Number(s.session_duration) || 60
+  const outOfClasses = (lowStudents ?? []).filter(s => remMin(s) <= 0)
+  const oneLast      = (lowStudents ?? []).filter(s => remMin(s) > 0 && remMin(s) <= planOf(s))
+  const twoLeft      = (lowStudents ?? []).filter(s => remMin(s) > planOf(s) && remMin(s) <= 2 * planOf(s))
 
   const cardStyle = { background: '#fff', border: '1px solid #E5E7EB', borderRadius: '16px', overflow: 'hidden' }
   const hdrStyle  = (color: string) => ({ padding: '14px 20px', background: color, display: 'flex', alignItems: 'center', justifyContent: 'space-between' })
@@ -80,7 +84,7 @@ export default async function SupervisorRemindersPage() {
                 <td style={{ ...cell, fontWeight: '600', color: '#111827' }}>{s.name}</td>
                 <td style={cell}>{s.phone ?? '—'}</td>
                 <td style={cell}>{(s.assigned_teacher as any)?.profile?.name ?? '—'}</td>
-                {cols.includes('Remaining') && <td style={{ ...cell, fontWeight: '700', color: (s.remaining_classes ?? 0) <= 0 ? '#DC2626' : '#D97706' }}>{s.remaining_classes ?? 0}</td>}
+                {cols.includes('Remaining') && <td style={{ ...cell, fontWeight: '700', color: (s.remaining_minutes ?? 0) <= 0 ? '#DC2626' : '#D97706' }}>{fmtHours(s.remaining_minutes)}</td>}
                 {cols.includes('Status') && <td style={cell}>{s.student_status}</td>}
                 {cols.includes('Currency') && <td style={cell}>{s.currency}</td>}
                 {cols.includes('Actions') && (

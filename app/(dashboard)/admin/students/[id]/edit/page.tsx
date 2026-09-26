@@ -7,6 +7,8 @@ import { useRouter, useParams } from 'next/navigation'
 import { COUNTRIES, COUNTRY_CURRENCY } from '@/lib/countries'
 import BrowseGroupsModal from '@/components/BrowseGroupsModal'
 import CreateGroupButton from '@/components/CreateGroupButton'
+import { PLAN_DURATIONS } from '@/lib/duration'
+import { fmtHours } from '@/lib/duration'
 
 export default function EditStudentPage() {
   const router = useRouter()
@@ -66,8 +68,15 @@ export default function EditStudentPage() {
   async function adjustClasses(type: 'add' | 'subtract', field: 'total_paid_classes' | 'consumed_classes', amount: number) {
     const current = form[field] ?? 0
     const newVal = type === 'add' ? current + amount : Math.max(0, current - amount)
-    const { error: err } = await supabase.from('students').update({ [field]: newVal }).eq('id', id)
-    if (!err) setForm((f: any) => ({ ...f, [field]: newVal }))
+    // Minutes are the source of truth, so adjust them in step with the class
+    // counter — otherwise a manual correction silently desyncs the balance.
+    const minField = field === 'total_paid_classes' ? 'total_paid_minutes' : 'consumed_minutes'
+    const per      = Number(form.session_duration) || 60
+    const curMin   = form[minField] ?? 0
+    const newMin   = type === 'add' ? curMin + amount * per : Math.max(0, curMin - amount * per)
+    const { error: err } = await supabase.from('students')
+      .update({ [field]: newVal, [minField]: newMin }).eq('id', id)
+    if (!err) setForm((f: any) => ({ ...f, [field]: newVal, [minField]: newMin }))
   }
 
   const inp = { width: '100%', padding: '9px 14px', border: '1.5px solid #E5E7EB', borderRadius: '8px', fontSize: '14px', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' as const }
@@ -80,6 +89,10 @@ export default function EditStudentPage() {
   if (!form) return <div style={{ padding: '60px', textAlign: 'center', color: '#DC2626' }}>Student not found</div>
 
   const remaining = (form.total_paid_classes ?? 0) - (form.consumed_classes ?? 0)
+  // Minutes are the source of truth for the balance
+  const totalMin  = form.total_paid_minutes ?? 0
+  const usedMin   = form.consumed_minutes ?? 0
+  const remainMin = totalMin - usedMin
 
   return (
     <div style={{ maxWidth: '940px' }}>
@@ -98,9 +111,9 @@ export default function EditStudentPage() {
           {/* Live display */}
           <div style={{ display: 'flex', gap: '24px', marginBottom: '20px', flexWrap: 'wrap' }}>
             {[
-              { label: 'Total Purchased', value: form.total_paid_classes ?? 0, color: '#0D1B2A' },
-              { label: 'Consumed', value: form.consumed_classes ?? 0, color: '#374151' },
-              { label: 'Remaining', value: remaining, color: remaining <= 2 ? '#D97706' : '#059669' },
+              { label: 'Total Purchased', value: fmtHours(totalMin), color: '#0D1B2A' },
+              { label: 'Consumed', value: fmtHours(usedMin), color: '#374151' },
+              { label: 'Remaining', value: fmtHours(remainMin), color: remainMin <= 60 ? '#D97706' : '#059669' },
             ].map(item => (
               <div key={item.label} style={{ textAlign: 'center', background: '#F9FAFB', borderRadius: '10px', padding: '14px 24px' }}>
                 <p style={{ fontSize: '11px', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 4px 0' }}>{item.label}</p>
@@ -180,11 +193,10 @@ export default function EditStudentPage() {
             </div>
             <div><label style={lbl}>Session Duration</label>
               <select style={inp} value={form.session_duration ?? 60} onChange={e => setForm((f: any) => ({...f, session_duration: Number(e.target.value)}))}>
-                <option value={30}>30 minutes</option>
-                <option value={40}>40 minutes</option>
-                <option value={60}>60 minutes (1 hour)</option>
-                <option value={90}>90 minutes (1.5 hours)</option>
-                <option value={120}>120 minutes (2 hours)</option>
+                {PLAN_DURATIONS.map(d => <option key={d.value} value={d.value}>{d.label}</option>)}
+                {![30,60].includes(Number(form.session_duration)) && (
+                  <option value={Number(form.session_duration)}>{form.session_duration} minutes (legacy — please update)</option>
+                )}
               </select>
             </div>
             <div><label style={lbl}>Student Status</label>

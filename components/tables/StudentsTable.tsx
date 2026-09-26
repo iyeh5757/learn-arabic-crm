@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { Eye, Edit, AlertTriangle } from 'lucide-react'
 import type { Role } from '@/types'
+import { fmtHours } from '@/lib/duration'
 
 const STATUS_BADGE = {
   active:   'bg-green-100 text-green-800',
@@ -30,8 +31,8 @@ export default function StudentsTable({ students, role }: { students: any[]; rol
               <th className="table-header">Phone</th>
               <th className="table-header">Country</th>
               <th className="table-header">Currency</th>
-              <th className="table-header text-center">Classes</th>
-              <th className="table-header text-center">Remaining</th>
+              <th className="table-header text-center">Used / Paid</th>
+              <th className="table-header text-center">Time left</th>
               <th className="table-header">Payment</th>
               <th className="table-header">Added By</th>
               <th className="table-header">Actions</th>
@@ -42,8 +43,13 @@ export default function StudentsTable({ students, role }: { students: any[]; rol
               <tr><td colSpan={10} className="text-center py-12 text-gray-400 text-sm">No students found</td></tr>
             )}
             {students.map((s: any) => {
+              // Minutes are the source of truth; classes are a legacy fallback
+              const remainMin = s.remaining_minutes
+                ?? ((s.total_paid_minutes ?? 0) - (s.consumed_minutes ?? 0))
+              const usedMin   = s.consumed_minutes ?? 0
+              const totalMin  = s.total_paid_minutes ?? 0
               const remaining = s.remaining_classes ?? (s.total_paid_classes - s.consumed_classes)
-              const needsRenewal = remaining <= 2 && s.student_status !== 'inactive'
+              const needsRenewal = remainMin <= 60 && s.student_status !== 'inactive'
               return (
                 <tr key={s.id} className={`hover:bg-gray-50 ${needsRenewal ? 'bg-amber-50/40' : ''}`}>
                   <td className="table-cell">
@@ -69,12 +75,17 @@ export default function StudentsTable({ students, role }: { students: any[]; rol
                     <span className="badge bg-gray-100 text-gray-700">{s.currency}</span>
                   </td>
                   <td className="table-cell text-center">
-                    <span className="text-sm text-gray-700">{s.consumed_classes} / {s.total_paid_classes}</span>
+                    <span className="text-sm text-gray-700">{fmtHours(usedMin)} / {fmtHours(totalMin)}</span>
                   </td>
                   <td className="table-cell text-center">
-                    <span className={`font-bold text-sm ${remaining <= 0 ? 'text-red-600' : remaining <= 2 ? 'text-amber-600' : 'text-green-700'}`}>
-                      {remaining}
+                    <span className={`font-bold text-sm ${remainMin <= 0 ? 'text-red-600' : remainMin <= 60 ? 'text-amber-600' : 'text-green-700'}`}>
+                      {fmtHours(remainMin)}
                     </span>
+                    {s.session_duration > 0 && remainMin > 0 && (
+                      <div className="text-[11px] text-gray-400">
+                        ≈ {Math.floor(remainMin / s.session_duration)} × {s.session_duration}m
+                      </div>
+                    )}
                   </td>
                   <td className="table-cell">
                     <span className={`badge ${PAYMENT_BADGE[s.payment_status as keyof typeof PAYMENT_BADGE]}`}>
